@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import Image from "next/image"
 import { FileText } from "lucide-react"
 import { toast } from "sonner"
@@ -27,14 +28,6 @@ export function BookingCard({ booking }: { booking: Booking }) {
 
   function handleInvoice() {
     toast.success(`Downloading invoice for ${booking.hotel}`)
-  }
-
-  function handleModify() {
-    toast.info(`Modifying your stay at ${booking.hotel}`)
-  }
-
-  function handleCancel() {
-    toast.error(`Cancelled your booking at ${booking.hotel}`)
   }
 
   return (
@@ -77,12 +70,24 @@ export function BookingCard({ booking }: { booking: Booking }) {
             </Button>
             {isConfirmed ? (
               <>
-                <Button size="sm" variant="outline" onClick={handleModify}>
-                  Modify
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCancel}>
-                  Cancel
-                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  render={
+                    <Link href={`/dashboard/bookings/${booking.id}/modify`}>
+                      Modify
+                    </Link>
+                  }
+                />
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  render={
+                    <Link href={`/dashboard/bookings/${booking.id}/cancel`}>
+                      Cancel
+                    </Link>
+                  }
+                />
               </>
             ) : null}
           </div>

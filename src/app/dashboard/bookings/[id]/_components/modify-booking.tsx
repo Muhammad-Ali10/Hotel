@@ -1,0 +1,261 @@
+"use client"
+
+import * as React from "react"
+import Link from "next/link"
+import Image from "next/image"
+import { useRouter } from "next/navigation"
+import { ArrowLeft, CalendarDays, MapPin, Users } from "lucide-react"
+import { toast } from "sonner"
+
+import type { Booking } from "@/types"
+import { placeholderImage } from "@/lib/images"
+import { formatCurrency, formatDate } from "@/lib/format"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { StatusBadge } from "../../../_components/status-badge"
+
+const guestItems = [1, 2, 3, 4].map((n) => ({
+  value: String(n),
+  label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
+}))
+
+function nightsBetween(a: string, b: string) {
+  const diff = (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000
+  return Number.isFinite(diff) && diff > 0 ? Math.round(diff) : 0
+}
+
+export function ModifyBooking({ booking }: { booking: Booking }) {
+  const router = useRouter()
+  const [checkIn, setCheckIn] = React.useState(booking.checkIn)
+  const [checkOut, setCheckOut] = React.useState(booking.checkOut)
+  const [guests, setGuests] = React.useState(String(booking.guests))
+  const [requests, setRequests] = React.useState("")
+
+  const originalNights = Math.max(1, nightsBetween(booking.checkIn, booking.checkOut))
+  const nightlyRate = Math.round(booking.total / originalNights)
+  const newNights = nightsBetween(checkIn, checkOut)
+  const validDates = newNights > 0
+  const newTotal = nightlyRate * Math.max(1, newNights)
+  const diff = newTotal - booking.total
+
+  const changed =
+    checkIn !== booking.checkIn ||
+    checkOut !== booking.checkOut ||
+    guests !== String(booking.guests) ||
+    requests.trim() !== ""
+
+  function handleSave() {
+    if (!validDates) {
+      toast.error("Check-out must be after check-in.")
+      return
+    }
+    if (!changed) {
+      toast.info("No changes to save.")
+      return
+    }
+    toast.success(`Your booking at ${booking.hotel} has been updated.`)
+    router.push("/dashboard/bookings")
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-ml-2"
+          render={
+            <Link href="/dashboard/bookings">
+              <ArrowLeft className="size-4" />
+              Back to My Bookings
+            </Link>
+          }
+        />
+        <h1 className="font-heading mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+          Modify Booking
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Update your stay details. Any price difference is shown on the right.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+        {/* LEFT — editable details */}
+        <div className="space-y-6">
+          <Card className="overflow-hidden pt-0">
+            <div className="flex flex-col sm:flex-row">
+              <div className="relative h-40 w-full shrink-0 overflow-hidden sm:h-auto sm:w-44">
+                <Image
+                  src={placeholderImage(booking.seed, 400, 300)}
+                  alt={booking.hotel}
+                  fill
+                  sizes="(max-width: 640px) 100vw, 176px"
+                  className="object-cover"
+                />
+              </div>
+              <CardContent className="min-w-0 flex-1 py-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="font-heading text-lg font-semibold">
+                      {booking.hotel}
+                    </h2>
+                    <p className="text-muted-foreground text-sm">
+                      {booking.room}
+                    </p>
+                  </div>
+                  <StatusBadge status={booking.status} />
+                </div>
+                <p className="text-muted-foreground mt-3 flex items-center gap-1 text-sm">
+                  <MapPin className="size-3.5" />
+                  {booking.city}
+                </p>
+              </CardContent>
+            </div>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="check-in">Check in</Label>
+                  <div className="relative">
+                    <CalendarDays className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                    <Input
+                      id="check-in"
+                      type="date"
+                      value={checkIn}
+                      onChange={(e) => setCheckIn(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="check-out">Check out</Label>
+                  <div className="relative">
+                    <CalendarDays className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                    <Input
+                      id="check-out"
+                      type="date"
+                      value={checkOut}
+                      onChange={(e) => setCheckOut(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Guests</Label>
+                <Select
+                  items={guestItems}
+                  value={guests}
+                  onValueChange={(v) => setGuests(v as string)}
+                >
+                  <SelectTrigger className="w-full">
+                    <Users className="text-muted-foreground size-4" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {guestItems.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="requests">Special requests (optional)</Label>
+                <Textarea
+                  id="requests"
+                  value={requests}
+                  onChange={(e) => setRequests(e.target.value)}
+                  placeholder="Early check-in, room preference…"
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT — price change + actions */}
+        <div>
+          <Card className="lg:sticky lg:top-24">
+            <CardContent className="space-y-4">
+              <h3 className="font-heading font-semibold">Updated Summary</h3>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">New dates</span>
+                  <span className="text-right font-medium">
+                    {formatDate(checkIn)} → {formatDate(checkOut)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Nights</span>
+                  <span className="font-medium">
+                    {validDates ? Math.max(1, newNights) : "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Guests</span>
+                  <span className="font-medium">{guests}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Original total</span>
+                  <span className="font-medium">
+                    {formatCurrency(booking.total)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-base">
+                  <span className="font-heading font-semibold">New total</span>
+                  <span className="font-heading font-semibold">
+                    {formatCurrency(newTotal)}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className={
+                  diff === 0
+                    ? "bg-muted/50 text-muted-foreground rounded-lg border px-3 py-2.5 text-sm"
+                    : diff > 0
+                      ? "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+                      : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                }
+              >
+                {diff === 0
+                  ? "No price change."
+                  : diff > 0
+                    ? `Additional payment of ${formatCurrency(diff)} required.`
+                    : `You'll be refunded ${formatCurrency(-diff)}.`}
+              </div>
+
+              <Button size="lg" className="w-full" onClick={handleSave}>
+                Save Changes
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                render={<Link href="/dashboard/bookings">Discard</Link>}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

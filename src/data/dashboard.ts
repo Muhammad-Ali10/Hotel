@@ -103,6 +103,10 @@ export const bookings: Booking[] = [
   },
 ]
 
+export function getBooking(id: string) {
+  return bookings.find((b) => b.id === id) ?? bookings[0]
+}
+
 export const userReviews: UserReview[] = [
   {
     id: "ur1",

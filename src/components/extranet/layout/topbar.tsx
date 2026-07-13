@@ -2,12 +2,11 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Bell, Building2, ChevronDown, Menu, Search } from "lucide-react"
+import { Building2, ChevronDown, Menu } from "lucide-react"
 
 import { properties, activeProperty, currentUser } from "@/data/extranet"
 import { avatarImage } from "@/lib/images"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -26,6 +25,8 @@ import {
 } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/layout/mode-toggle"
 import { ExtranetSidebar } from "./sidebar"
+import { NotificationsMenu } from "./notifications-menu"
+import { TopbarSearch } from "./topbar-search"
 
 const initials = currentUser.name
   .split(" ")
@@ -90,29 +91,13 @@ export function ExtranetTopbar() {
         </DropdownMenu>
 
         {/* Search */}
-        <div className="relative hidden flex-1 md:block">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-          <Input
-            placeholder="Search reservations, guests…"
-            className="bg-muted/40 h-9 max-w-md pl-8"
-          />
-        </div>
+        <TopbarSearch />
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           <ModeToggle />
 
           {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Notifications"
-            className="relative"
-          >
-            <Bell className="size-5" />
-            <span className="bg-primary text-primary-foreground absolute top-1 right-1 flex size-4 items-center justify-center rounded-full text-[10px] font-medium">
-              4
-            </span>
-          </Button>
+          <NotificationsMenu />
 
           {/* Profile */}
           <DropdownMenu>
