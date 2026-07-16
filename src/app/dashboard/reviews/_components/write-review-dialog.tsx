@@ -4,7 +4,7 @@ import * as React from "react"
 import { Star } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Booking, ReviewCategories, ReviewCategory } from "@/types"
+import type { Booking, ReviewCategories } from "@/types"
 import { REVIEW_CATEGORIES } from "@/types"
 import { cn } from "@/lib/utils"
 import { useStore } from "@/store"

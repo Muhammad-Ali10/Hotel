@@ -30,25 +30,26 @@ export function EditDetailsDialog({ hotel }: { hotel: Hotel }) {
   const updateHotel = useStore((s) => s.updateHotel)
   const updatePolicies = useStore((s) => s.updatePolicies)
 
-  const [form, setForm] = React.useState({
-    name: hotel.name,
-    description: hotel.description,
-    address: hotel.address,
-    checkInTime: hotel.policies.checkInTime,
-    checkOutTime: hotel.policies.checkOutTime,
-  })
-  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
-
-  // Re-sync when the partner switches property.
-  React.useEffect(() => {
-    setForm({
+  const draftFrom = React.useCallback(
+    () => ({
       name: hotel.name,
       description: hotel.description,
       address: hotel.address,
       checkInTime: hotel.policies.checkInTime,
       checkOutTime: hotel.policies.checkOutTime,
-    })
-  }, [hotel])
+    }),
+    [hotel]
+  )
+
+  const [form, setForm] = React.useState(draftFrom)
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
+
+  /** Reloads the draft from the property each time the dialog opens, which also
+   *  covers the partner switching property behind it. */
+  function handleOpenChange(next: boolean) {
+    if (next) setForm(draftFrom())
+    setOpen(next)
+  }
 
   function handleSave() {
     updateHotel(hotel.id, {
@@ -65,7 +66,7 @@ export function EditDetailsDialog({ hotel }: { hotel: Hotel }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm" className="shrink-0">

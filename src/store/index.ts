@@ -508,11 +508,14 @@ export const useStore = create<Store>()(
         set((state) => ({
           hotels: state.hotels.map((h) => {
             if (h.id !== hotelId) return h
-            const set_ = new Set(h.availability.closedDates)
-            for (const d of dates) closed ? set_.add(d) : set_.delete(d)
+            const next = new Set(h.availability.closedDates)
+            for (const d of dates) {
+              if (closed) next.add(d)
+              else next.delete(d)
+            }
             return {
               ...h,
-              availability: { ...h.availability, closedDates: [...set_].sort() },
+              availability: { ...h.availability, closedDates: [...next].sort() },
             }
           }),
         })),

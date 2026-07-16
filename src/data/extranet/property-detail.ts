@@ -1,8 +1,5 @@
 import type {
   AmenityGroup,
-  Photo,
-  Policy,
-  RoomType,
 } from "@/lib/extranet/types"
 
 /** The Ritz-Carlton room types — units sum to 142, booked to 89, available to 53. */

@@ -1,23 +1,4 @@
-import type {
-  AmenityGroup,
-  ReservationPolicy,
-  ScoreCategory,
-} from "@/lib/extranet/types"
-
-/* --------------------------- Property Score ---------------------------- */
-
-const scoreStatus = (s: number) =>
-  s >= 90 ? "Excellent" : s >= 85 ? "Great" : s >= 75 ? "Good" : "Needs Work"
-
-const rawCategories: Omit<ScoreCategory, "status">[] = [
-  { id: "sc1", name: "Photos & Media", score: 92, tip: "All photos are high quality. Consider adding a virtual tour." },
-  { id: "sc2", name: "Description Quality", score: 78, tip: "Add more detail about nearby attractions and local experiences." },
-  { id: "sc3", name: "Amenities Listed", score: 85, tip: "You have 24/30 amenities. Add sustainability features." },
-  { id: "sc4", name: "Policies Completeness", score: 90, tip: "All policies are clearly defined." },
-  { id: "sc5", name: "Response Rate", score: 95, tip: "Average response time: 2.3 hours. Great job!" },
-  { id: "sc6", name: "Review Score", score: 84, tip: "Average rating 4.2/5. Respond to the 4 pending reviews." },
-  { id: "sc7", name: "Rate Competitiveness", score: 72, tip: "Your rates are 12% above market average. Consider adjusting." },
-]
+import type { AmenityGroup } from "@/lib/extranet/types"
 
 export const facilityGroups: AmenityGroup[] = [
   {

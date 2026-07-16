@@ -44,12 +44,20 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  nativeButton,
+  render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      render={render}
+      // A `render` prop means this button is something else underneath — almost
+      // always a Link. Base UI needs to know so it applies button semantics
+      // rather than assuming a native <button>; without it every
+      // `<Button render={<Link/>}/>` in the app logged an a11y error.
+      nativeButton={nativeButton ?? render === undefined}
       {...props}
     />
   )

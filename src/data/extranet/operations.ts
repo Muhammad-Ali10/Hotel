@@ -1,4 +1,4 @@
-import type { Opportunity, Promotion, RatePlan } from "@/lib/extranet/types"
+import type { Opportunity, RatePlan } from "@/lib/extranet/types"
 
 /** Rate Plans — 8 plans, 7 active. */
 export const ratePlans: RatePlan[] = [

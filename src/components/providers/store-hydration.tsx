@@ -28,13 +28,10 @@ export function StoreHydration() {
  * flicker.
  */
 export function useHydrated() {
-  const [hydrated, setHydrated] = React.useState(() => useStore.persist.hasHydrated())
-
-  React.useEffect(() => {
-    const unsub = useStore.persist.onFinishHydration(() => setHydrated(true))
-    if (useStore.persist.hasHydrated()) setHydrated(true)
-    return unsub
-  }, [])
-
-  return hydrated
+  return React.useSyncExternalStore(
+    (onChange) => useStore.persist.onFinishHydration(onChange),
+    () => useStore.persist.hasHydrated(),
+    // the server never has persisted state
+    () => false
+  )
 }

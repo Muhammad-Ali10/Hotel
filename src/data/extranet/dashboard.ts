@@ -1,5 +1,4 @@
 import type {
-  CheckIn,
   PendingAction,
   SeriesPoint,
   SourceSlice,

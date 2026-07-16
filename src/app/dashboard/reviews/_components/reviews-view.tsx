@@ -24,15 +24,23 @@ export function ReviewsView() {
   const reviewable = useReviewableBookings()
   const hotels = useHotels()
   const deleteReview = useStore((s) => s.deleteReview)
-  const [writing, setWriting] = React.useState<Booking | null>(null)
+  const [picked, setPicked] = React.useState<Booking | null>(null)
+  const [dismissedDeepLink, setDismissedDeepLink] = React.useState(false)
 
-  // Deep link from a booking card ("Write a review") or a hotel page.
+  // Deep link from a booking card ("Write a review") or a hotel page. Derived
+  // rather than pushed into state by an effect, so the dialog opens on the
+  // first render instead of a second one.
   const bookingParam = params.get("booking")
-  React.useEffect(() => {
-    if (!bookingParam) return
-    const match = reviewable.find((b) => b.id === bookingParam)
-    if (match) setWriting(match)
-  }, [bookingParam, reviewable])
+  const deepLinked =
+    bookingParam && !dismissedDeepLink
+      ? (reviewable.find((b) => b.id === bookingParam) ?? null)
+      : null
+  const writing = picked ?? deepLinked
+
+  function closeDialog() {
+    setPicked(null)
+    setDismissedDeepLink(true)
+  }
 
   return (
     <div className="space-y-8">
@@ -65,7 +73,7 @@ export function ReviewsView() {
                       Stayed {formatDate(booking.checkOut)}
                     </p>
                   </div>
-                  <Button size="sm" onClick={() => setWriting(booking)}>
+                  <Button size="sm" onClick={() => setPicked(booking)}>
                     <PenLine className="size-3.5" />
                     Review
                   </Button>
@@ -115,7 +123,7 @@ export function ReviewsView() {
         <WriteReviewDialog
           booking={writing}
           open={Boolean(writing)}
-          onOpenChange={(open) => !open && setWriting(null)}
+          onOpenChange={(open) => !open && closeDialog()}
         />
       ) : null}
     </div>

@@ -7,7 +7,6 @@ import { formatCurrency } from "@/lib/format"
 import { formatTime24 } from "@/lib/domain"
 import { useActiveHotel } from "@/store/selectors"
 import { Icon } from "@/components/extranet/shared"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { NotFoundCard } from "@/components/shared/not-found-card"
 
