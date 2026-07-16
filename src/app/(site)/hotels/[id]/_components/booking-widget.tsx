@@ -113,7 +113,7 @@ export function BookingWidget({
           </div>
         </div>
 
-        <div className="space-y-2">
+        {/* <div className="space-y-2">
           <Button
             className={cn("w-full bg-emerald-600 text-white hover:bg-emerald-700")}
             onClick={() => toast("Opening WhatsApp to reserve…")}
@@ -129,7 +129,7 @@ export function BookingWidget({
             <Phone className="size-4" />
             Need help? Call Us
           </Button>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   )

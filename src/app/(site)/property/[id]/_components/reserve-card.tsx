@@ -197,14 +197,14 @@ export function ReserveCard({ hotel }: { hotel: Hotel }) {
           </span>
         </div>
 
-        <Button
+        {/* <Button
           variant="outline"
           className="w-full"
           onClick={() => toast("Opening WhatsApp to reserve…")}
         >
           <MessageCircle className="size-4" />
           Reserve on WhatsApp
-        </Button>
+        </Button> */}
       </CardContent>
     </Card>
   )
