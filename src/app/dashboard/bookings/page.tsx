@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 
-import { bookings } from "@/data"
-import { BookingCard } from "./_components/booking-card"
+import { BookingsList } from "./_components/bookings-list"
 
 export const metadata: Metadata = {
   title: "My Bookings — Stayora",
@@ -15,11 +14,7 @@ export default function MyBookingsPage() {
         My Bookings
       </h1>
 
-      <div className="space-y-4">
-        {bookings.map((booking) => (
-          <BookingCard key={booking.id} booking={booking} />
-        ))}
-      </div>
+      <BookingsList />
     </div>
   )
 }

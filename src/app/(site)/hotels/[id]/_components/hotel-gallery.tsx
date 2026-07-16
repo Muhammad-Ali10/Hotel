@@ -2,126 +2,90 @@
 
 import * as React from "react"
 import Image from "next/image"
-import { ChevronLeft, ChevronRight, Heart, Share2 } from "lucide-react"
+import { Images, Share2 } from "lucide-react"
+import { toast } from "sonner"
 
-import { cn } from "@/lib/utils"
+import type { Photo } from "@/types"
 import { hotelImage } from "@/lib/images"
 import { Button } from "@/components/ui/button"
+import { FavoriteButton } from "@/components/marketplace/favorite-button"
 
+/** Renders the partner's photo list, in the order they arranged it. */
 export function HotelGallery({
-  seed,
+  hotelId,
   name,
-  count = 4,
+  photos,
 }: {
-  seed: string
+  hotelId: string
   name: string
-  count?: number
+  photos: Photo[]
 }) {
-  const [index, setIndex] = React.useState(0)
   const images = React.useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => ({
-        full: hotelImage(`${seed}-${i}`, 1280, 720),
-        thumb: hotelImage(`${seed}-${i}`, 320, 220),
-      })),
-    [seed, count]
+    () => photos.slice(0, 5).map((p) => ({ ...p, src: hotelImage(p.seed, 1280, 720) })),
+    [photos]
   )
-  const go = (delta: number) =>
-    setIndex((i) => (i + delta + count) % count)
 
   return (
-    <div className="space-y-3">
-      {/* Main image */}
-      <div className="bg-muted relative aspect-[16/9] w-full overflow-hidden rounded-2xl">
-        <Image
-          key={index}
-          src={images[index].full}
-          alt={`${name} photo ${index + 1}`}
-          fill
-          priority
-          sizes="(max-width: 1024px) 100vw, 66vw"
-          className="object-cover"
-        />
-
-        {/* top-right actions */}
-        <div className="absolute top-3 right-3 flex gap-2">
-          <IconCircle label="Share">
-            <Share2 className="size-4" />
-          </IconCircle>
-          <IconCircle label="Save">
-            <Heart className="size-4" />
-          </IconCircle>
-        </div>
-
-        {/* prev / next */}
-        <button
-          type="button"
-          onClick={() => go(-1)}
-          aria-label="Previous photo"
-          className="bg-background/80 hover:bg-background text-foreground absolute top-1/2 left-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-sm backdrop-blur transition"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => go(1)}
-          aria-label="Next photo"
-          className="bg-background/80 hover:bg-background text-foreground absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-full shadow-sm backdrop-blur transition"
-        >
-          <ChevronRight className="size-5" />
-        </button>
-
-        {/* counter */}
-        <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
-          {index + 1} / {count}
-        </span>
-      </div>
-
-      {/* Thumbnails */}
-      <div className="grid grid-cols-4 gap-2 sm:gap-3">
-        {images.map((img, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => setIndex(i)}
-            aria-label={`View photo ${i + 1}`}
-            className={cn(
-              "relative aspect-[4/3] overflow-hidden rounded-lg ring-2 transition",
-              i === index
-                ? "ring-primary"
-                : "ring-transparent opacity-80 hover:opacity-100"
-            )}
-          >
+    <div className="relative">
+      <div className="grid h-[300px] grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-2xl sm:h-[460px]">
+        {/* Main image */}
+        <div className="bg-muted relative col-span-4 row-span-2 sm:col-span-2">
+          {images[0] ? (
             <Image
-              src={img.thumb}
-              alt={`${name} thumbnail ${i + 1}`}
+              src={images[0].src}
+              alt={`${name} — ${images[0].caption}`}
               fill
-              sizes="(max-width: 1024px) 25vw, 16vw"
+              priority
+              sizes="(max-width: 640px) 100vw, 50vw"
               className="object-cover"
             />
-          </button>
+          ) : null}
+        </div>
+
+        {/* Secondary images (desktop only) */}
+        {images.slice(1, 5).map((photo) => (
+          <div key={photo.id} className="bg-muted relative hidden sm:block">
+            <Image
+              src={photo.src}
+              alt={`${name} — ${photo.caption}`}
+              fill
+              sizes="25vw"
+              className="object-cover"
+            />
+          </div>
         ))}
       </div>
-    </div>
-  )
-}
 
-function IconCircle({
-  children,
-  label,
-}: {
-  children: React.ReactNode
-  label: string
-}) {
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      size="icon"
-      aria-label={label}
-      className="bg-background/80 hover:bg-background size-9 rounded-full shadow-sm backdrop-blur"
-    >
-      {children}
-    </Button>
+      {/* Top-right actions */}
+      <div className="absolute top-3 right-3 flex gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          aria-label="Share"
+          onClick={() => toast("Share link copied to clipboard")}
+          className="bg-background/80 hover:bg-background size-9 rounded-full shadow-sm backdrop-blur"
+        >
+          <Share2 className="size-4" />
+        </Button>
+        <FavoriteButton
+          hotelId={hotelId}
+          hotelName={name}
+          className="bg-background/80 hover:bg-background"
+        />
+      </div>
+
+      {/* Show all photos */}
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={() => toast(`${photos.length} photos in this gallery`)}
+        className="bg-background/85 hover:bg-background absolute right-3 bottom-3 gap-2 shadow-sm backdrop-blur"
+      >
+        <Images className="size-4" />
+        Show all photos
+      </Button>
+    </div>
   )
 }

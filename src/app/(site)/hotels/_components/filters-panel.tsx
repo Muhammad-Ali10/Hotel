@@ -1,7 +1,5 @@
 "use client"
 
-import * as React from "react"
-
 import type { PropertyType } from "@/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -17,7 +15,8 @@ import {
 
 export type Filters = {
   price: number
-  stars: number[]
+  /** minimum review score, e.g. 4.5 */
+  minRating: number | null
   types: PropertyType[]
   amenities: string[]
   rooms: string[]
@@ -25,46 +24,47 @@ export type Filters = {
 
 export const defaultFilters: Filters = {
   price: 2000,
-  stars: [],
+  minRating: null,
   types: [],
   amenities: [],
   rooms: [],
 }
 
-const propertyTypes: PropertyType[] = [
-  "Hotel",
-  "Resort",
-  "Apartment",
-  "Villa",
-  "Boutique",
+/**
+ * Score buckets, not star counts. Every hotel scores between 3.9 and 5.0, so
+ * the old "5 stars" checkbox could never match anything — `Math.floor(4.9)` is
+ * 4, and no property was ever going to floor to 5.
+ */
+const ratingOptions = [
+  { value: 4.5, label: "4.5+", caption: "Exceptional" },
+  { value: 4, label: "4.0+", caption: "Excellent" },
+  { value: 3.5, label: "3.5+", caption: "Very good" },
+  { value: 3, label: "3.0+", caption: "Good" },
 ]
-const amenityOptions = [
-  "WiFi",
-  "Pool",
-  "Spa",
-  "Gym",
-  "Parking",
-  "Restaurant",
-  "Bar",
-  "Breakfast",
-]
-const roomTypes = ["Single", "Double", "Suite", "Family", "Penthouse"]
-const starOptions = [5, 4, 3, 2, 1]
 
 function toggle<T>(list: T[], value: T): T[] {
-  return list.includes(value)
-    ? list.filter((v) => v !== value)
-    : [...list, value]
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
 }
 
 export function FiltersPanel({
   filters,
   onChange,
   className,
+  typeOptions,
+  amenityOptions,
+  roomOptions,
+  maxPrice,
 }: {
   filters: Filters
   onChange: (next: Filters) => void
   className?: string
+  /** Options are derived from the catalogue, so they can never offer a filter
+   *  that matches nothing (the panel used to list Apartment / Villa / Boutique
+   *  and room types no property had). */
+  typeOptions: PropertyType[]
+  amenityOptions: string[]
+  roomOptions: string[]
+  maxPrice: number
 }) {
   return (
     <div className={cn("space-y-1", className)}>
@@ -72,15 +72,15 @@ export function FiltersPanel({
         <h2 className="font-heading text-lg font-semibold">Filters</h2>
         <button
           type="button"
-          onClick={() => onChange(defaultFilters)}
-          className="text-muted-foreground text-sm underline-offset-4 hover:text-foreground hover:underline"
+          onClick={() => onChange({ ...defaultFilters, price: maxPrice })}
+          className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
         >
           Reset All
         </button>
       </div>
 
       <Accordion
-        defaultValue={["price", "stars", "types", "amenities", "rooms"]}
+        defaultValue={["price", "rating", "types", "amenities", "rooms"]}
         className="w-full"
       >
         {/* PRICE RANGE */}
@@ -92,39 +92,39 @@ export function FiltersPanel({
             <Slider
               value={[filters.price]}
               min={0}
-              max={2000}
+              max={maxPrice}
               step={50}
               onValueChange={(v) =>
-                onChange({
-                  ...filters,
-                  price: Array.isArray(v) ? v[0] : (v as number),
-                })
+                onChange({ ...filters, price: Array.isArray(v) ? v[0] : (v as number) })
               }
             />
             <div className="text-muted-foreground flex items-center justify-between text-sm">
               <span>$0</span>
-              <span>$2000</span>
+              <span>${maxPrice}</span>
             </div>
             <p className="text-sm font-medium">Max: ${filters.price} / night</p>
           </AccordionContent>
         </AccordionItem>
 
-        {/* STAR RATING */}
-        <AccordionItem value="stars">
+        {/* GUEST RATING */}
+        <AccordionItem value="rating">
           <AccordionTrigger className="font-heading font-semibold">
-            Star Rating
+            Guest Rating
           </AccordionTrigger>
           <AccordionContent className="space-y-2.5">
-            {starOptions.map((s) => (
-              <Label key={s} className="gap-2.5 font-normal">
+            {ratingOptions.map((o) => (
+              <Label key={o.value} className="gap-2.5 font-normal">
                 <Checkbox
-                  checked={filters.stars.includes(s)}
+                  checked={filters.minRating === o.value}
                   onCheckedChange={() =>
-                    onChange({ ...filters, stars: toggle(filters.stars, s) })
+                    onChange({
+                      ...filters,
+                      minRating: filters.minRating === o.value ? null : o.value,
+                    })
                   }
                 />
-                <span className="text-amber-400">{"★".repeat(s)}</span>
-                <span className="text-muted-foreground">&amp; Up</span>
+                <span className="font-medium">{o.label}</span>
+                <span className="text-muted-foreground">{o.caption}</span>
               </Label>
             ))}
           </AccordionContent>
@@ -136,13 +136,11 @@ export function FiltersPanel({
             Property Type
           </AccordionTrigger>
           <AccordionContent className="space-y-2.5">
-            {propertyTypes.map((t) => (
+            {typeOptions.map((t) => (
               <Label key={t} className="gap-2.5 font-normal">
                 <Checkbox
                   checked={filters.types.includes(t)}
-                  onCheckedChange={() =>
-                    onChange({ ...filters, types: toggle(filters.types, t) })
-                  }
+                  onCheckedChange={() => onChange({ ...filters, types: toggle(filters.types, t) })}
                 />
                 {t}
               </Label>
@@ -152,19 +150,14 @@ export function FiltersPanel({
 
         {/* AMENITIES */}
         <AccordionItem value="amenities">
-          <AccordionTrigger className="font-heading font-semibold">
-            Amenities
-          </AccordionTrigger>
+          <AccordionTrigger className="font-heading font-semibold">Amenities</AccordionTrigger>
           <AccordionContent className="space-y-2.5">
             {amenityOptions.map((a) => (
               <Label key={a} className="gap-2.5 font-normal">
                 <Checkbox
                   checked={filters.amenities.includes(a)}
                   onCheckedChange={() =>
-                    onChange({
-                      ...filters,
-                      amenities: toggle(filters.amenities, a),
-                    })
+                    onChange({ ...filters, amenities: toggle(filters.amenities, a) })
                   }
                 />
                 {a}
@@ -175,17 +168,13 @@ export function FiltersPanel({
 
         {/* ROOM TYPE */}
         <AccordionItem value="rooms">
-          <AccordionTrigger className="font-heading font-semibold">
-            Room Type
-          </AccordionTrigger>
+          <AccordionTrigger className="font-heading font-semibold">Room Type</AccordionTrigger>
           <AccordionContent className="space-y-2.5">
-            {roomTypes.map((r) => (
+            {roomOptions.map((r) => (
               <Label key={r} className="gap-2.5 font-normal">
                 <Checkbox
                   checked={filters.rooms.includes(r)}
-                  onCheckedChange={() =>
-                    onChange({ ...filters, rooms: toggle(filters.rooms, r) })
-                  }
+                  onCheckedChange={() => onChange({ ...filters, rooms: toggle(filters.rooms, r) })}
                 />
                 {r}
               </Label>
@@ -197,7 +186,7 @@ export function FiltersPanel({
       <Button
         variant="outline"
         className="mt-2 w-full"
-        onClick={() => onChange(defaultFilters)}
+        onClick={() => onChange({ ...defaultFilters, price: maxPrice })}
       >
         Reset All
       </Button>

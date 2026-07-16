@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { parseISODate, toISODate } from "@/lib/domain"
 import { locations } from "@/data/locations"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -43,28 +44,43 @@ const DROP_DOWN = {
 
 export function HeroSearch({
   initialLocation = "",
+  initialCheckIn,
+  initialCheckOut,
+  initialGuests,
   className,
   glow = true,
 }: {
   initialLocation?: string
+  initialCheckIn?: string
+  initialCheckOut?: string
+  initialGuests?: number
   className?: string
   glow?: boolean
 } = {}) {
   const router = useRouter()
   const [active, setActive] = React.useState<string | null>(null)
   const [location, setLocation] = React.useState(initialLocation)
-  const [checkIn, setCheckIn] = React.useState<Date>()
-  const [checkOut, setCheckOut] = React.useState<Date>()
+  const [checkIn, setCheckIn] = React.useState<Date | undefined>(() =>
+    initialCheckIn ? parseISODate(initialCheckIn) : undefined
+  )
+  const [checkOut, setCheckOut] = React.useState<Date | undefined>(() =>
+    initialCheckOut ? parseISODate(initialCheckOut) : undefined
+  )
   const [guests, setGuests] = React.useState<Guests>({
-    adults: 2,
+    adults: initialGuests ?? 2,
     children: 0,
     rooms: 1,
   })
 
+  /** Carries the dates and party size through to the results — the search used
+   *  to collect them and then push `?city=` alone, dropping both. */
   function onSearch() {
-    router.push(
-      location ? `/hotels?city=${encodeURIComponent(location)}` : "/hotels"
-    )
+    const params = new URLSearchParams()
+    if (location) params.set("city", location)
+    if (checkIn) params.set("checkin", toISODate(checkIn))
+    if (checkOut) params.set("checkout", toISODate(checkOut))
+    params.set("guests", String(guests.adults + guests.children))
+    router.push(`/hotels?${params.toString()}`)
   }
 
   const guestLabel = `${guests.adults + guests.children} Guests, ${guests.rooms} ${

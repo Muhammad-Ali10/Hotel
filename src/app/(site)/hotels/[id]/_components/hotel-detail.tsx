@@ -1,20 +1,24 @@
+"use client"
+
+import * as React from "react"
 import Link from "next/link"
 import {
+  Baby,
   Ban,
   BedDouble,
   Check,
   Cigarette,
   Clock,
   CreditCard,
-  Flame,
   MapPin,
   PawPrint,
   Ruler,
   Users,
 } from "lucide-react"
 
-import { getHotel, hotels } from "@/data"
 import { formatCurrency, formatNumber } from "@/lib/format"
+import { formatTime24 } from "@/lib/domain"
+import { useHotel, useHotelRating, useHotels } from "@/store/selectors"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -29,8 +33,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { HotelCard } from "@/components/marketplace/hotel-card"
-import { PropertyGallery } from "./_components/property-gallery"
-import { ReserveCard } from "./_components/reserve-card"
+import { DiscountBadge } from "@/components/marketplace/discount-badge"
+import { NotFoundCard } from "@/components/shared/not-found-card"
+import { HotelGallery } from "./hotel-gallery"
+import { HotelReviews } from "./hotel-reviews"
+import { ReserveCard } from "./reserve-card"
 
 const amenityChips: Record<string, string> = {
   Breakfast: "🍳",
@@ -44,41 +51,42 @@ const amenityChips: Record<string, string> = {
   Beach: "🏖",
 }
 
-const houseRules = [
-  { icon: Clock, label: "Check-in", value: "From 3:00 PM" },
-  { icon: Clock, label: "Check-out", value: "Until 12:00 PM" },
-  { icon: Ban, label: "Cancellation", value: "Free until 24h before" },
-  { icon: CreditCard, label: "Payment", value: "Card or pay at property" },
-  { icon: PawPrint, label: "Pets", value: "Not allowed" },
-  { icon: Cigarette, label: "Smoking", value: "Designated areas only" },
-]
+export function HotelDetail({ id }: { id: string }) {
+  const hotel = useHotel(id)
+  const hotels = useHotels()
+  const rating = useHotelRating(id)
+  const [roomId, setRoomId] = React.useState<string | undefined>(undefined)
 
-const ratingCategories = [
-  { label: "Cleanliness", value: 4.9 },
-  { label: "Comfort", value: 4.8 },
-  { label: "Location", value: 4.9 },
-  { label: "Facilities", value: 4.7 },
-  { label: "Staff", value: 5.0 },
-]
+  if (!hotel) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+        <NotFoundCard
+          title="Hotel not found"
+          description="This property is no longer listed."
+          href="/hotels"
+          cta="Browse hotels"
+        />
+      </div>
+    )
+  }
 
-function ratingLabel(rating: number) {
-  if (rating >= 4.8) return "Exceptional"
-  if (rating >= 4.5) return "Excellent"
-  if (rating >= 4) return "Very Good"
-  return "Good"
-}
-
-export default async function Page({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const hotel = getHotel(id)
-
+  const selectedRoomId = roomId ?? hotel.rooms[0]?.id
   const visibleAmenities = hotel.amenities.slice(0, 5)
   const moreCount = hotel.amenities.length - visibleAmenities.length
-  const similar = hotels.filter((h) => h.id !== hotel.id).slice(0, 3)
+  const similar = hotels.filter((h) => h.id !== hotel.id && h.city !== hotel.city).slice(0, 3)
+
+  // Every rule below is whatever the partner set in the extranet — the page used
+  // to hardcode its own values, which is how "pets not allowed" ended up
+  // contradicting the property's own pets-at-$35 policy.
+  const houseRules = [
+    { icon: Clock, label: "Check-in", value: `From ${formatTime24(hotel.policies.checkInTime)}` },
+    { icon: Clock, label: "Check-out", value: `Until ${formatTime24(hotel.policies.checkOutTime)}` },
+    { icon: Ban, label: "Cancellation", value: hotel.policies.cancellation },
+    { icon: CreditCard, label: "Payment", value: hotel.policies.payment },
+    { icon: PawPrint, label: "Pets", value: hotel.policies.pets },
+    { icon: Cigarette, label: "Smoking", value: hotel.policies.smoking },
+    { icon: Baby, label: "Children", value: hotel.policies.children },
+  ]
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -96,9 +104,7 @@ export default async function Page({
           <BreadcrumbItem>
             <BreadcrumbLink
               render={
-                <Link href={`/hotels?city=${encodeURIComponent(hotel.city)}`}>
-                  {hotel.city}
-                </Link>
+                <Link href={`/hotels?city=${encodeURIComponent(hotel.city)}`}>{hotel.city}</Link>
               }
             />
           </BreadcrumbItem>
@@ -111,7 +117,7 @@ export default async function Page({
 
       {/* GALLERY */}
       <div className="mt-4">
-        <PropertyGallery seed={hotel.seed} name={hotel.name} />
+        <HotelGallery hotelId={hotel.id} name={hotel.name} photos={hotel.photos} />
       </div>
 
       {/* TITLE */}
@@ -119,19 +125,24 @@ export default async function Page({
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">{hotel.type}</Badge>
-            {hotel.discountLabel ? <Badge>{hotel.discountLabel}</Badge> : null}
+            {hotel.discount ? <DiscountBadge discount={hotel.discount} /> : null}
           </div>
           <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
             {hotel.name}
           </h1>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-            <span className="flex items-center gap-1.5">
-              <StarRating rating={hotel.rating} size="size-4" />
-              <span className="font-medium">{hotel.rating}</span>
-              <span className="text-muted-foreground">
-                ({formatNumber(hotel.reviewCount)} Reviews)
+            {rating.reviewCount > 0 ? (
+              <span className="flex items-center gap-1.5">
+                <StarRating rating={rating.rating} size="size-4" />
+                <span className="font-medium">{rating.rating}</span>
+                <Link href="#reviews" className="text-muted-foreground hover:underline">
+                  ({formatNumber(rating.reviewCount)}{" "}
+                  {rating.reviewCount === 1 ? "review" : "reviews"})
+                </Link>
               </span>
-            </span>
+            ) : (
+              <span className="text-muted-foreground">No reviews yet</span>
+            )}
             <span className="text-muted-foreground flex items-center gap-1.5">
               <MapPin className="size-4" />
               {hotel.city}, {hotel.country}
@@ -147,9 +158,7 @@ export default async function Page({
                 {a}
               </Badge>
             ))}
-            {moreCount > 0 ? (
-              <Badge variant="secondary">+{moreCount} more</Badge>
-            ) : null}
+            {moreCount > 0 ? <Badge variant="secondary">+{moreCount} more</Badge> : null}
           </div>
         </div>
 
@@ -164,37 +173,30 @@ export default async function Page({
         </div>
       </div>
 
-      {/* URGENCY BANNER */}
-      <div className="mt-5 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
-        <Flame className="size-4 shrink-0" />
-        <span>
-          <span className="font-semibold">In high demand</span> — booked 18 times
-          in the last 24 hours. Only a few rooms left at this price.
-        </span>
-      </div>
-
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
         {/* LEFT */}
         <div className="min-w-0 space-y-10">
           {/* ABOUT */}
           <section>
-            <h2 className="font-heading text-xl font-semibold">
-              About This Property
-            </h2>
-            <p className="text-muted-foreground mt-3 text-pretty">
-              {hotel.description}
-            </p>
+            <h2 className="font-heading text-xl font-semibold">About This Property</h2>
+            <p className="text-muted-foreground mt-3 text-pretty">{hotel.description}</p>
           </section>
 
           {/* CHOOSE YOUR ROOM */}
-          <section id="rooms">
+          <section id="rooms" className="scroll-mt-24">
             <h2 className="font-heading text-xl font-semibold">Choose Your Room</h2>
             <div className="mt-4 grid grid-cols-1 gap-4">
               {hotel.rooms.map((room) => (
-                <Card key={room.id}>
+                <Card
+                  key={room.id}
+                  className={
+                    room.id === selectedRoomId ? "ring-primary/40 ring-2" : undefined
+                  }
+                >
                   <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 flex-1 space-y-2">
                       <h3 className="font-heading font-semibold">{room.name}</h3>
+                      <p className="text-muted-foreground text-sm">{room.description}</p>
                       <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                         <span className="flex items-center gap-1">
                           <Users className="size-3.5" />
@@ -206,7 +208,7 @@ export default async function Page({
                         </span>
                         <span className="flex items-center gap-1">
                           <Ruler className="size-3.5" />
-                          {room.size}
+                          {room.size} m²
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1.5 pt-1">
@@ -223,15 +225,20 @@ export default async function Page({
                         <span className="font-heading text-xl font-semibold">
                           {formatCurrency(room.pricePerNight)}
                         </span>
-                        <span className="text-muted-foreground text-sm">
-                          {" "}
-                          / night
-                        </span>
+                        <span className="text-muted-foreground text-sm"> / night</span>
                       </p>
                       <Button
                         size="sm"
-                        render={<a href="#reserve">Reserve</a>}
-                      />
+                        variant={room.id === selectedRoomId ? "default" : "outline"}
+                        onClick={() => {
+                          setRoomId(room.id)
+                          document
+                            .getElementById("reserve")
+                            ?.scrollIntoView({ behavior: "smooth", block: "center" })
+                        }}
+                      >
+                        {room.id === selectedRoomId ? "Selected" : "Select"}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -241,9 +248,7 @@ export default async function Page({
 
           {/* AMENITIES */}
           <section>
-            <h2 className="font-heading text-xl font-semibold">
-              Amenities &amp; Facilities
-            </h2>
+            <h2 className="font-heading text-xl font-semibold">Amenities &amp; Facilities</h2>
             <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
               {hotel.amenities.map((a) => (
                 <div key={a} className="flex items-center gap-2 text-sm">
@@ -262,15 +267,13 @@ export default async function Page({
             <Card className="mt-4">
               <CardContent className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
                 {houseRules.map((rule) => (
-                  <div key={rule.label} className="flex items-center gap-3">
+                  <div key={rule.label} className="flex items-start gap-3">
                     <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
                       <rule.icon className="size-4" />
                     </span>
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{rule.label}</p>
-                      <p className="text-muted-foreground text-sm">
-                        {rule.value}
-                      </p>
+                      <p className="text-muted-foreground text-sm">{rule.value}</p>
                     </div>
                   </div>
                 ))}
@@ -279,75 +282,10 @@ export default async function Page({
           </section>
 
           {/* REVIEWS */}
-          <section id="reviews">
-            <h2 className="font-heading text-xl font-semibold">Guest Reviews</h2>
-
-            <Card className="mt-4">
-              <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr] sm:items-center">
-                <div className="flex flex-col items-center justify-center gap-1 sm:pr-6">
-                  <span className="font-heading text-4xl font-semibold">
-                    {hotel.rating}
-                  </span>
-                  <StarRating rating={hotel.rating} size="size-4" />
-                  <span className="text-sm font-medium">
-                    {ratingLabel(hotel.rating)}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {formatNumber(hotel.reviewCount)} reviews
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                  {ratingCategories.map((c) => (
-                    <div key={c.label} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{c.label}</span>
-                        <span className="font-medium">{c.value.toFixed(1)}</span>
-                      </div>
-                      <div className="bg-muted h-1.5 w-full overflow-hidden rounded-full">
-                        <div
-                          className="bg-primary h-full rounded-full"
-                          style={{ width: `${(c.value / 5) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="mt-4 space-y-4">
-              {hotel.reviews.map((review) => (
-                <Card key={review.id}>
-                  <CardContent className="space-y-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-heading font-semibold">
-                          {review.author}
-                        </span>
-                        <Badge variant="secondary" className="gap-1">
-                          <Check className="size-3" />
-                          {review.badge}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <StarRating rating={review.rating} size="size-3.5" />
-                        <span className="text-sm font-medium">
-                          {review.rating}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-muted-foreground text-sm text-pretty">
-                      {review.comment}
-                    </p>
-                    <p className="text-muted-foreground text-xs">{review.date}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
+          <HotelReviews hotelId={hotel.id} hotelName={hotel.name} />
 
           {/* LOCATION */}
-          <section id="location">
+          <section id="location" className="scroll-mt-24">
             <h2 className="font-heading text-xl font-semibold">Location</h2>
             <Card className="mt-4">
               <CardContent>
@@ -357,9 +295,9 @@ export default async function Page({
                   </span>
                   <div>
                     <p className="font-heading font-semibold">{hotel.name}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {hotel.city}, {hotel.country}
-                    </p>
+                    {/* The address the partner entered — this line used to read
+                        "50 Central Park South" for all ten hotels. */}
+                    <p className="text-muted-foreground text-sm">{hotel.address}</p>
                   </div>
                   <Button
                     variant="outline"
@@ -367,7 +305,7 @@ export default async function Page({
                     render={
                       <a
                         href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          `${hotel.name} ${hotel.city}`
+                          `${hotel.name} ${hotel.address}`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -384,30 +322,30 @@ export default async function Page({
 
         {/* RIGHT */}
         <div className="min-w-0">
-          <ReserveCard hotel={hotel} />
+          <ReserveCard hotel={hotel} selectedRoomId={selectedRoomId} onSelectRoom={setRoomId} />
         </div>
       </div>
 
       {/* SIMILAR PROPERTIES */}
-      <section className="mt-14">
-        <Separator className="mb-8" />
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-heading text-2xl font-semibold">
-            Similar Properties
-          </h2>
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto px-0"
-            render={<Link href="/hotels">View All ›</Link>}
-          />
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {similar.map((h) => (
-            <HotelCard key={h.id} hotel={h} />
-          ))}
-        </div>
-      </section>
+      {similar.length > 0 ? (
+        <section className="mt-14">
+          <Separator className="mb-8" />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-heading text-2xl font-semibold">Similar Properties</h2>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-0"
+              render={<Link href="/hotels">View All ›</Link>}
+            />
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {similar.map((h) => (
+              <HotelCard key={h.id} hotel={h} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   )
 }

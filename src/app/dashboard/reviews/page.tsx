@@ -1,19 +1,17 @@
-import { userReviews } from "@/data"
+import type { Metadata } from "next"
+import { Suspense } from "react"
 
-import { ReviewCard } from "./_components/review-card"
+import { ReviewsView } from "./_components/reviews-view"
+
+export const metadata: Metadata = {
+  title: "My Reviews — Stayora",
+  description: "Reviews you've written and stays waiting to be reviewed.",
+}
 
 export default function ReviewsPage() {
   return (
-    <div className="space-y-8">
-      <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-        My Reviews
-      </h1>
-
-      <div className="space-y-4">
-        {userReviews.map((review) => (
-          <ReviewCard key={review.id} review={review} />
-        ))}
-      </div>
-    </div>
+    <Suspense>
+      <ReviewsView />
+    </Suspense>
   )
 }

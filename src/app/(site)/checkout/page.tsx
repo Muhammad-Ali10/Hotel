@@ -1,6 +1,8 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 
 import { getHotel } from "@/data"
+import { addDays, toISODate } from "@/lib/domain"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,7 +11,13 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { NotFoundCard } from "@/components/shared/not-found-card"
 import { CheckoutFlow } from "./_components/checkout-flow"
+
+export const metadata: Metadata = {
+  title: "Checkout — Stayora",
+  description: "Complete your booking.",
+}
 
 function first(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v
@@ -23,14 +31,27 @@ export default async function Page({
   const sp = await searchParams
   const hotel = getHotel(first(sp.hotel) ?? "")
 
+  if (!hotel) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+        <NotFoundCard
+          title="Nothing to check out"
+          description="Pick a property and dates to start a booking."
+          href="/hotels"
+          cta="Browse hotels"
+        />
+      </div>
+    )
+  }
+
   const roomParam = first(sp.room)
   const roomId =
-    roomParam && hotel.rooms.some((r) => r.id === roomParam)
-      ? roomParam
-      : hotel.rooms[0].id
-  const checkIn = first(sp.checkin) ?? "2026-06-25"
-  const checkOut = first(sp.checkout) ?? "2026-06-27"
-  const guests = first(sp.guests) ?? "2-1"
+    roomParam && hotel.rooms.some((r) => r.id === roomParam) ? roomParam : hotel.rooms[0].id
+
+  const today = toISODate(new Date())
+  const checkIn = first(sp.checkin) ?? addDays(today, 1)
+  const checkOut = first(sp.checkout) ?? addDays(checkIn, hotel.availability.minStay || 2)
+  const guests = Number(first(sp.guests)) || 2
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
@@ -41,9 +62,7 @@ export default async function Page({
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbLink
-              render={<Link href={`/hotels/${hotel.id}`}>{hotel.name}</Link>}
-            />
+            <BreadcrumbLink render={<Link href={`/hotels/${hotel.id}`}>{hotel.name}</Link>} />
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
@@ -58,7 +77,7 @@ export default async function Page({
 
       <div className="mt-6">
         <CheckoutFlow
-          hotel={hotel}
+          hotelId={hotel.id}
           roomId={roomId}
           checkIn={checkIn}
           checkOut={checkOut}

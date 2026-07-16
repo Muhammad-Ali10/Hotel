@@ -4,12 +4,14 @@ import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CalendarDays, MapPin, Users } from "lucide-react"
+import { AlertTriangle, ArrowLeft, CalendarDays, MapPin, Users } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Booking } from "@/types"
 import { placeholderImage } from "@/lib/images"
 import { formatCurrency, formatDate } from "@/lib/format"
+import { checkStay, priceBooking } from "@/lib/domain"
+import { useStore } from "@/store"
+import { useBooking, useHotel } from "@/store/selectors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -23,48 +25,89 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { StatusBadge } from "../../../_components/status-badge"
+import { StatusBadge } from "@/components/shared/status-badge"
+import { NotFoundCard } from "@/components/shared/not-found-card"
 
-const guestItems = [1, 2, 3, 4].map((n) => ({
+const guestItems = [1, 2, 3, 4, 5, 6].map((n) => ({
   value: String(n),
   label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
 }))
 
-function nightsBetween(a: string, b: string) {
-  const diff = (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000
-  return Number.isFinite(diff) && diff > 0 ? Math.round(diff) : 0
-}
-
-export function ModifyBooking({ booking }: { booking: Booking }) {
+export function ModifyBooking({ id }: { id: string }) {
   const router = useRouter()
-  const [checkIn, setCheckIn] = React.useState(booking.checkIn)
-  const [checkOut, setCheckOut] = React.useState(booking.checkOut)
-  const [guests, setGuests] = React.useState(String(booking.guests))
-  const [requests, setRequests] = React.useState("")
+  const booking = useBooking(id)
+  const hotel = useHotel(booking?.hotelId ?? "")
+  const modifyBooking = useStore((s) => s.modifyBooking)
 
-  const originalNights = Math.max(1, nightsBetween(booking.checkIn, booking.checkOut))
-  const nightlyRate = Math.round(booking.total / originalNights)
-  const newNights = nightsBetween(checkIn, checkOut)
-  const validDates = newNights > 0
-  const newTotal = nightlyRate * Math.max(1, newNights)
-  const diff = newTotal - booking.total
+  const [checkIn, setCheckIn] = React.useState(booking?.checkIn ?? "")
+  const [checkOut, setCheckOut] = React.useState(booking?.checkOut ?? "")
+  const [guests, setGuests] = React.useState(String(booking?.guests ?? 2))
+  const [requests, setRequests] = React.useState(booking?.specialRequests ?? "")
+
+  if (!booking || !hotel) {
+    return (
+      <NotFoundCard
+        title="Booking not found"
+        description="We couldn't find a reservation with that reference."
+        href="/dashboard/bookings"
+        cta="Back to My Bookings"
+      />
+    )
+  }
+
+  if (booking.status === "cancelled") {
+    return (
+      <NotFoundCard
+        title="This booking was cancelled"
+        description="Cancelled reservations can no longer be modified."
+        href="/dashboard/bookings"
+        cta="Back to My Bookings"
+      />
+    )
+  }
+
+  const room = hotel.rooms.find((r) => r.id === booking.roomId)
+  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  const validDates = stay.ok
+
+  // Re-priced with the same function that quoted the original booking, so the
+  // difference shown here is the difference the guest will actually be charged.
+  const newPricing =
+    validDates && room
+      ? priceBooking({
+          hotel,
+          room,
+          checkIn,
+          checkOut,
+          guests: Number(guests),
+          addOns: booking.addOns,
+        })
+      : null
+
+  const diff = newPricing ? newPricing.total - booking.pricing.total : 0
 
   const changed =
     checkIn !== booking.checkIn ||
     checkOut !== booking.checkOut ||
     guests !== String(booking.guests) ||
-    requests.trim() !== ""
+    requests.trim() !== booking.specialRequests.trim()
 
   function handleSave() {
-    if (!validDates) {
-      toast.error("Check-out must be after check-in.")
+    if (!stay.ok) {
+      toast.error(stay.message)
       return
     }
     if (!changed) {
       toast.info("No changes to save.")
       return
     }
-    toast.success(`Your booking at ${booking.hotel} has been updated.`)
+    modifyBooking(id, {
+      checkIn,
+      checkOut,
+      guests: Number(guests),
+      specialRequests: requests.trim(),
+    })
+    toast.success(`Your booking at ${booking!.hotelName} has been updated.`)
     router.push("/dashboard/bookings")
   }
 
@@ -98,7 +141,7 @@ export function ModifyBooking({ booking }: { booking: Booking }) {
               <div className="relative h-40 w-full shrink-0 overflow-hidden sm:h-auto sm:w-44">
                 <Image
                   src={placeholderImage(booking.seed, 400, 300)}
-                  alt={booking.hotel}
+                  alt={booking.hotelName}
                   fill
                   sizes="(max-width: 640px) 100vw, 176px"
                   className="object-cover"
@@ -108,10 +151,11 @@ export function ModifyBooking({ booking }: { booking: Booking }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="font-heading text-lg font-semibold">
-                      {booking.hotel}
+                      {booking.hotelName}
                     </h2>
-                    <p className="text-muted-foreground text-sm">
-                      {booking.room}
+                    <p className="text-muted-foreground text-sm">{booking.roomName}</p>
+                    <p className="text-muted-foreground mt-0.5 font-mono text-xs">
+                      {booking.id}
                     </p>
                   </div>
                   <StatusBadge status={booking.status} />
@@ -154,6 +198,13 @@ export function ModifyBooking({ booking }: { booking: Booking }) {
                   </div>
                 </div>
               </div>
+
+              {!stay.ok ? (
+                <p className="text-destructive flex items-center gap-1.5 text-sm">
+                  <AlertTriangle className="size-3.5" />
+                  {stay.message}
+                </p>
+              ) : null}
 
               <div className="space-y-1.5">
                 <Label>Guests</Label>
@@ -205,9 +256,7 @@ export function ModifyBooking({ booking }: { booking: Booking }) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Nights</span>
-                  <span className="font-medium">
-                    {validDates ? Math.max(1, newNights) : "—"}
-                  </span>
+                  <span className="font-medium">{newPricing?.nights ?? "—"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Guests</span>
@@ -217,34 +266,36 @@ export function ModifyBooking({ booking }: { booking: Booking }) {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Original total</span>
                   <span className="font-medium">
-                    {formatCurrency(booking.total)}
+                    {formatCurrency(booking.pricing.total)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-base">
                   <span className="font-heading font-semibold">New total</span>
                   <span className="font-heading font-semibold">
-                    {formatCurrency(newTotal)}
+                    {newPricing ? formatCurrency(newPricing.total) : "—"}
                   </span>
                 </div>
               </div>
 
-              <div
-                className={
-                  diff === 0
-                    ? "bg-muted/50 text-muted-foreground rounded-lg border px-3 py-2.5 text-sm"
+              {newPricing ? (
+                <div
+                  className={
+                    diff === 0
+                      ? "bg-muted/50 text-muted-foreground rounded-lg border px-3 py-2.5 text-sm"
+                      : diff > 0
+                        ? "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
+                        : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+                  }
+                >
+                  {diff === 0
+                    ? "No price change."
                     : diff > 0
-                      ? "rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200"
-                      : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-200"
-                }
-              >
-                {diff === 0
-                  ? "No price change."
-                  : diff > 0
-                    ? `Additional payment of ${formatCurrency(diff)} required.`
-                    : `You'll be refunded ${formatCurrency(-diff)}.`}
-              </div>
+                      ? `Additional payment of ${formatCurrency(diff)} required.`
+                      : `You'll be refunded ${formatCurrency(-diff)}.`}
+                </div>
+              ) : null}
 
-              <Button size="lg" className="w-full" onClick={handleSave}>
+              <Button size="lg" className="w-full" onClick={handleSave} disabled={!validDates}>
                 Save Changes
               </Button>
               <Button

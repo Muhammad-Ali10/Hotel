@@ -7,16 +7,20 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, CalendarDays, Info, MapPin, Users } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Booking } from "@/types"
 import { placeholderImage } from "@/lib/images"
 import { formatCurrency, formatDate } from "@/lib/format"
+import { refundFor, toISODate } from "@/lib/domain"
+import { refundStatusLabel } from "@/lib/labels"
+import { useStore } from "@/store"
+import { useBooking } from "@/store/selectors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-import { StatusBadge } from "../../../_components/status-badge"
+import { StatusBadge } from "@/components/shared/status-badge"
+import { NotFoundCard } from "@/components/shared/not-found-card"
 
 const reasons = [
   "Change of plans",
@@ -26,28 +30,52 @@ const reasons = [
   "Other",
 ]
 
-export function CancelBooking({ booking }: { booking: Booking }) {
+export function CancelBooking({ id }: { id: string }) {
   const router = useRouter()
+  const booking = useBooking(id)
+  const cancelBooking = useStore((s) => s.cancelBooking)
   const [reason, setReason] = React.useState("")
   const [details, setDetails] = React.useState("")
 
-  const nights = Math.max(
-    1,
-    Math.round(
-      (new Date(booking.checkOut).getTime() -
-        new Date(booking.checkIn).getTime()) /
-        86_400_000
+  if (!booking) {
+    return (
+      <NotFoundCard
+        title="Booking not found"
+        description="We couldn't find a reservation with that reference."
+        href="/dashboard/bookings"
+        cta="Back to My Bookings"
+      />
     )
-  )
-  const refund = booking.total // free cancellation window → full refund
+  }
+
+  if (booking.status === "cancelled") {
+    return (
+      <NotFoundCard
+        title="Already cancelled"
+        description={`${booking.id} was cancelled on ${formatDate(booking.cancellation!.date)}.`}
+        href="/dashboard/bookings"
+        cta="Back to My Bookings"
+      />
+    )
+  }
+
+  const { nights } = booking.pricing
+  // The refund follows the property's cancellation policy — the same function
+  // the store uses when the cancellation is actually written.
+  const { refund, refundStatus } = refundFor(booking, toISODate(new Date()))
+  const fee = booking.pricing.total - refund
 
   function handleCancel() {
     if (!reason) {
       toast.error("Please select a reason for cancellation.")
       return
     }
+    const fullReason = details.trim() ? `${reason} — ${details.trim()}` : reason
+    cancelBooking(id, fullReason, "guest")
     toast.success(
-      `Booking cancelled. A refund of ${formatCurrency(refund)} will be processed.`
+      refund > 0
+        ? `Booking cancelled. A refund of ${formatCurrency(refund)} will be processed.`
+        : "Booking cancelled."
     )
     router.push("/dashboard/bookings")
   }
@@ -83,7 +111,7 @@ export function CancelBooking({ booking }: { booking: Booking }) {
               <div className="relative h-40 w-full shrink-0 overflow-hidden sm:h-auto sm:w-44">
                 <Image
                   src={placeholderImage(booking.seed, 400, 300)}
-                  alt={booking.hotel}
+                  alt={booking.hotelName}
                   fill
                   sizes="(max-width: 640px) 100vw, 176px"
                   className="object-cover"
@@ -93,10 +121,11 @@ export function CancelBooking({ booking }: { booking: Booking }) {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h2 className="font-heading text-lg font-semibold">
-                      {booking.hotel}
+                      {booking.hotelName}
                     </h2>
-                    <p className="text-muted-foreground text-sm">
-                      {booking.room}
+                    <p className="text-muted-foreground text-sm">{booking.roomName}</p>
+                    <p className="text-muted-foreground mt-0.5 font-mono text-xs">
+                      {booking.id}
                     </p>
                   </div>
                   <StatusBadge status={booking.status} />
@@ -105,10 +134,7 @@ export function CancelBooking({ booking }: { booking: Booking }) {
                   <MetaItem icon={<MapPin className="size-3.5" />} label="Location">
                     {booking.city}
                   </MetaItem>
-                  <MetaItem
-                    icon={<CalendarDays className="size-3.5" />}
-                    label="Dates"
-                  >
+                  <MetaItem icon={<CalendarDays className="size-3.5" />} label="Dates">
                     {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)}
                     <span className="text-muted-foreground">
                       {" "}
@@ -159,13 +185,19 @@ export function CancelBooking({ booking }: { booking: Booking }) {
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Amount paid</span>
                   <span className="font-medium">
-                    {formatCurrency(booking.total)}
+                    {formatCurrency(booking.pricing.total)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Cancellation fee</span>
-                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                    Free
+                  <span
+                    className={
+                      fee > 0
+                        ? "font-medium"
+                        : "font-medium text-emerald-600 dark:text-emerald-400"
+                    }
+                  >
+                    {fee > 0 ? formatCurrency(fee) : "Free"}
                   </span>
                 </div>
                 <Separator />
@@ -175,6 +207,9 @@ export function CancelBooking({ booking }: { booking: Booking }) {
                     {formatCurrency(refund)}
                   </span>
                 </div>
+                <p className="text-muted-foreground text-xs">
+                  {refundStatusLabel[refundStatus]} under this property&apos;s policy.
+                </p>
               </div>
 
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
@@ -184,7 +219,7 @@ export function CancelBooking({ booking }: { booking: Booking }) {
 
               <Button
                 size="lg"
-                className="w-full bg-destructive text-white hover:bg-destructive/90"
+                className="bg-destructive hover:bg-destructive/90 w-full text-white"
                 onClick={handleCancel}
               >
                 Cancel Booking

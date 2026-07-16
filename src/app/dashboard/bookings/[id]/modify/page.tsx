@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 
-import { getBooking } from "@/data"
 import { ModifyBooking } from "../_components/modify-booking"
 
 export const metadata: Metadata = {
@@ -14,6 +13,5 @@ export default async function Page({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const booking = getBooking(id)
-  return <ModifyBooking booking={booking} />
+  return <ModifyBooking id={id} />
 }

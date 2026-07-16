@@ -4,25 +4,34 @@ import * as React from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Building2,
-  CalendarDays,
-  Check,
   ClipboardCheck,
   CreditCard,
+  Gift,
   Lock,
   MapPin,
   ShieldCheck,
   User,
-  Users,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Hotel } from "@/types"
+import type { BookingAddOn } from "@/types"
 import { formatCurrency, formatDate } from "@/lib/format"
+import {
+  checkStay,
+  formatTime24,
+  nightsBetween,
+  priceBooking,
+  valueAddPrice,
+} from "@/lib/domain"
 import { hotelImage } from "@/lib/images"
 import { cn } from "@/lib/utils"
+import { arrivalTimeSlots } from "@/data/config"
+import { useStore } from "@/store"
+import { useHotel, useProfile } from "@/store/selectors"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -32,61 +41,93 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-
-const TAX_RATE = 0.12
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { NotFoundCard } from "@/components/shared/not-found-card"
 
 const steps = [
   { n: 1, label: "Your Details", icon: User },
-  { n: 2, label: "Payment", icon: CreditCard },
-  { n: 3, label: "Review", icon: ClipboardCheck },
+  { n: 2, label: "Extras", icon: Gift },
+  { n: 3, label: "Payment", icon: CreditCard },
+  { n: 4, label: "Review", icon: ClipboardCheck },
 ]
 
+const arrivalItems = arrivalTimeSlots.map((slot) => ({ value: slot, label: slot }))
+
 export function CheckoutFlow({
-  hotel,
+  hotelId,
   roomId,
   checkIn,
   checkOut,
   guests,
 }: {
-  hotel: Hotel
+  hotelId: string
   roomId: string
   checkIn: string
   checkOut: string
-  guests: string
+  guests: number
 }) {
   const router = useRouter()
+  const hotel = useHotel(hotelId)
+  const profile = useProfile()
+  const createBooking = useStore((s) => s.createBooking)
+
   const [step, setStep] = React.useState(1)
+  const [addOnIds, setAddOnIds] = React.useState<string[]>([])
+  // Prefilled from the signed-in profile — the form used to start blank even
+  // though we knew exactly who was booking.
   const [form, setForm] = React.useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    country: "United States",
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    email: profile.email,
+    phone: profile.phone,
+    country: profile.country,
+    arrivalTime: arrivalTimeSlots[0],
     specialRequests: "",
-    payMethod: "card",
+    payMethod: "card" as "card" | "property",
     cardName: "",
     cardNumber: "",
     cardExpiry: "",
     cardCvv: "",
     agree: false,
   })
-  const set = (patch: Partial<typeof form>) =>
-    setForm((f) => ({ ...f, ...patch }))
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
+
+  if (!hotel) {
+    return (
+      <NotFoundCard
+        title="Hotel not found"
+        description="We couldn't find the property you were booking."
+        href="/hotels"
+        cta="Browse hotels"
+      />
+    )
+  }
 
   const room = hotel.rooms.find((r) => r.id === roomId) ?? hotel.rooms[0]
-  const [g, r] = guests.split("-")
-  const guestsLabel = `${g} ${Number(g) === 1 ? "Guest" : "Guests"}, ${r} ${Number(r) === 1 ? "Room" : "Rooms"}`
+  const stay = checkStay(hotel.availability, checkIn, checkOut)
 
-  const nights = React.useMemo(() => {
-    const diff =
-      (new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 86_400_000
-    return Number.isFinite(diff) && diff > 0 ? Math.round(diff) : 1
-  }, [checkIn, checkOut])
+  const nights = nightsBetween(checkIn, checkOut)
+  const availableAddOns = hotel.valueAdds.filter((v) => v.active)
+  const addOns: BookingAddOn[] = addOnIds
+    .map((id) => availableAddOns.find((v) => v.id === id))
+    .filter((v) => v !== undefined)
+    .map((v) => ({
+      id: v.id,
+      name: v.name,
+      price: valueAddPrice(v, { nights, guests }),
+      qty: 1,
+    }))
 
-  const subtotal = room.pricePerNight * nights
-  const taxes = Math.round(subtotal * TAX_RATE)
-  const total = subtotal + taxes
-  const nightLabel = nights === 1 ? "night" : "nights"
+  // One pricing function for the whole product — the reserve card quoted from
+  // it, the confirmation prints it, and the extranet invoices reconcile to it.
+  const pricing = priceBooking({ hotel, room, checkIn, checkOut, guests, addOns })
+  const nightLabel = pricing.nights === 1 ? "night" : "nights"
 
   function validate(current: number) {
     if (current === 1) {
@@ -94,8 +135,12 @@ export function CheckoutFlow({
         toast.error("Please enter your name and a valid email.")
         return false
       }
+      if (!form.phone.trim()) {
+        toast.error("Please enter a phone number so the property can reach you.")
+        return false
+      }
     }
-    if (current === 2 && form.payMethod === "card") {
+    if (current === 3 && form.payMethod === "card") {
       if (!form.cardName || !form.cardNumber || !form.cardExpiry || !form.cardCvv) {
         toast.error("Please complete your card details.")
         return false
@@ -106,8 +151,8 @@ export function CheckoutFlow({
 
   function next() {
     if (!validate(step)) return
-    setStep((s) => Math.min(3, s + 1))
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" })
+    setStep((s) => Math.min(steps.length, s + 1))
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   function back() {
@@ -119,19 +164,37 @@ export function CheckoutFlow({
       toast.error("Please accept the terms & conditions to continue.")
       return
     }
-    const ref = "STY-" + Math.random().toString(36).slice(2, 8).toUpperCase()
-    const params = new URLSearchParams({
-      hotel: hotel.id,
-      room: room.id,
-      checkin: checkIn,
-      checkout: checkOut,
+    if (!stay.ok) {
+      toast.error(stay.message)
+      return
+    }
+
+    // The booking is written to the store here. It is the same record the
+    // dashboard lists and the partner sees in the extranet — checkout used to
+    // just build a query string and forget everything else.
+    const booking = createBooking({
+      hotelId: hotel!.id,
+      roomId: room.id,
+      guest: {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        country: form.country,
+      },
+      checkIn,
+      checkOut,
       guests,
-      ref,
-      name: form.firstName,
-      email: form.email,
-      pay: form.payMethod,
+      arrivalTime: form.arrivalTime,
+      specialRequests: form.specialRequests,
+      addOns,
+      payment: {
+        method: form.payMethod,
+        status: form.payMethod === "card" ? "paid" : "pending",
+      },
     })
-    router.push(`/checkout/confirmation?${params.toString()}`)
+
+    router.push(`/checkout/confirmation?ref=${booking.id}`)
   }
 
   return (
@@ -139,24 +202,21 @@ export function CheckoutFlow({
       {/* STEPPER */}
       <ol className="flex items-center">
         {steps.map((s, i) => (
-          <li
-            key={s.n}
-            className={cn("flex items-center", i < steps.length - 1 && "flex-1")}
-          >
+          <li key={s.n} className={cn("flex items-center", i < steps.length - 1 && "flex-1")}>
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-colors",
+                  "flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium transition-colors",
                   step >= s.n
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    ? "bg-primary text-primary-foreground border-transparent"
+                    : "text-muted-foreground"
                 )}
               >
-                {step > s.n ? <Check className="size-4" /> : s.n}
+                {s.n}
               </span>
               <span
                 className={cn(
-                  "hidden text-sm font-medium sm:block",
+                  "hidden text-sm font-medium sm:inline",
                   step >= s.n ? "text-foreground" : "text-muted-foreground"
                 )}
               >
@@ -166,7 +226,7 @@ export function CheckoutFlow({
             {i < steps.length - 1 ? (
               <span
                 className={cn(
-                  "mx-3 h-px flex-1",
+                  "mx-2 h-px flex-1 transition-colors sm:mx-4",
                   step > s.n ? "bg-primary" : "bg-border"
                 )}
               />
@@ -175,54 +235,54 @@ export function CheckoutFlow({
         ))}
       </ol>
 
+      {!stay.ok ? (
+        <div className="border-destructive/30 bg-destructive/5 text-destructive mt-6 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm">
+          <AlertTriangle className="size-4 shrink-0" />
+          {stay.message}
+        </div>
+      ) : null}
+
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
-        {/* LEFT — step content */}
+        {/* LEFT — the steps */}
         <div className="min-w-0">
           {step === 1 ? (
-            <section className="space-y-5">
-              <div>
-                <h2 className="font-heading text-xl font-semibold">
-                  Guest Details
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  Who is this booking for?
-                </p>
-              </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="First name" htmlFor="firstName">
-                  <Input
-                    id="firstName"
-                    value={form.firstName}
-                    onChange={(e) => set({ firstName: e.target.value })}
-                    placeholder="John"
-                  />
-                </Field>
-                <Field label="Last name" htmlFor="lastName">
-                  <Input
-                    id="lastName"
-                    value={form.lastName}
-                    onChange={(e) => set({ lastName: e.target.value })}
-                    placeholder="Doe"
-                  />
-                </Field>
-                <Field label="Email" htmlFor="email">
-                  <Input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => set({ email: e.target.value })}
-                    placeholder="john@example.com"
-                  />
-                </Field>
-                <Field label="Phone" htmlFor="phone">
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => set({ phone: e.target.value })}
-                    placeholder="+1 555 000 1234"
-                  />
-                </Field>
+            <Card>
+              <CardContent className="space-y-5">
+                <h2 className="font-heading text-lg font-semibold">Your Details</h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="First name" htmlFor="first-name">
+                    <Input
+                      id="first-name"
+                      value={form.firstName}
+                      onChange={(e) => set({ firstName: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Last name" htmlFor="last-name">
+                    <Input
+                      id="last-name"
+                      value={form.lastName}
+                      onChange={(e) => set({ lastName: e.target.value })}
+                    />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="Email" htmlFor="email">
+                    <Input
+                      id="email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => set({ email: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Phone" htmlFor="phone">
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) => set({ phone: e.target.value })}
+                    />
+                  </Field>
+                </div>
                 <Field label="Country / Region" htmlFor="country">
                   <Input
                     id="country"
@@ -230,243 +290,260 @@ export function CheckoutFlow({
                     onChange={(e) => set({ country: e.target.value })}
                   />
                 </Field>
-              </div>
-              <Field label="Special requests (optional)" htmlFor="requests">
-                <Textarea
-                  id="requests"
-                  value={form.specialRequests}
-                  onChange={(e) => set({ specialRequests: e.target.value })}
-                  placeholder="Early check-in, high floor, airport transfer…"
-                  rows={3}
-                />
-              </Field>
-            </section>
+
+                {/* The property states a check-in time, so we ask when to expect
+                    the guest — the confirmation printed an arrival window we
+                    never actually collected. */}
+                <Field
+                  label={`Estimated arrival (check-in from ${formatTime24(hotel.policies.checkInTime)})`}
+                >
+                  <Select
+                    items={arrivalItems}
+                    value={form.arrivalTime}
+                    onValueChange={(v) => set({ arrivalTime: v as string })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {arrivalItems.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label="Special requests (optional)" htmlFor="requests">
+                  <Textarea
+                    id="requests"
+                    rows={3}
+                    value={form.specialRequests}
+                    onChange={(e) => set({ specialRequests: e.target.value })}
+                    placeholder="Room preference, celebrating something, dietary needs…"
+                  />
+                </Field>
+              </CardContent>
+            </Card>
           ) : null}
 
           {step === 2 ? (
-            <section className="space-y-5">
-              <div>
-                <h2 className="font-heading text-xl font-semibold">Payment</h2>
-                <p className="text-muted-foreground text-sm">
-                  Choose how you&apos;d like to pay.
-                </p>
-              </div>
+            <Card>
+              <CardContent className="space-y-5">
+                <div>
+                  <h2 className="font-heading text-lg font-semibold">Add to your stay</h2>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Extras offered by {hotel.name}. You can skip this step.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  {availableAddOns.map((v) => {
+                    const price = valueAddPrice(v, { nights: pricing.nights, guests })
+                    const checked = addOnIds.includes(v.id)
+                    return (
+                      <label
+                        key={v.id}
+                        className="hover:bg-accent/50 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() =>
+                            setAddOnIds((ids) =>
+                              ids.includes(v.id) ? ids.filter((i) => i !== v.id) : [...ids, v.id]
+                            )
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{v.name}</span>
+                            <Badge variant="outline">{v.category}</Badge>
+                          </div>
+                          <p className="text-muted-foreground text-sm">{v.description}</p>
+                        </div>
+                        <span className="shrink-0 text-sm font-medium">
+                          {formatCurrency(price)}
+                          <span className="text-muted-foreground block text-xs font-normal">
+                            {v.unit}
+                          </span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
 
-              <RadioGroup
-                value={form.payMethod}
-                onValueChange={(v) => set({ payMethod: v as string })}
-                className="gap-3"
-              >
-                <PayOption
-                  value="card"
-                  active={form.payMethod === "card"}
-                  icon={<CreditCard className="size-4" />}
-                  title="Credit / Debit Card"
-                  desc="Pay securely now"
-                />
-                <PayOption
-                  value="property"
-                  active={form.payMethod === "property"}
-                  icon={<Building2 className="size-4" />}
-                  title="Pay at Property"
-                  desc="No prepayment needed"
-                />
-              </RadioGroup>
+          {step === 3 ? (
+            <Card>
+              <CardContent className="space-y-5">
+                <h2 className="font-heading text-lg font-semibold">Payment</h2>
+                <RadioGroup
+                  value={form.payMethod}
+                  onValueChange={(v) => set({ payMethod: v as "card" | "property" })}
+                  className="gap-2"
+                >
+                  <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
+                    <RadioGroupItem value="card" />
+                    <CreditCard className="size-4" />
+                    Pay now by card
+                  </label>
+                  <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
+                    <RadioGroupItem value="property" />
+                    <Building2 className="size-4" />
+                    Pay at the property
+                  </label>
+                </RadioGroup>
 
-              {form.payMethod === "card" ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="sm:col-span-2">
-                    <Field label="Name on card" htmlFor="cardName">
+                {form.payMethod === "card" ? (
+                  <div className="space-y-4">
+                    <Field label="Name on card" htmlFor="card-name">
                       <Input
-                        id="cardName"
+                        id="card-name"
                         value={form.cardName}
                         onChange={(e) => set({ cardName: e.target.value })}
-                        placeholder="John Doe"
                       />
                     </Field>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Field label="Card number" htmlFor="cardNumber">
+                    <Field label="Card number" htmlFor="card-number">
                       <div className="relative">
-                        <CreditCard className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+                        <Lock className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
                         <Input
-                          id="cardNumber"
+                          id="card-number"
                           inputMode="numeric"
+                          placeholder="4242 4242 4242 4242"
                           value={form.cardNumber}
                           onChange={(e) => set({ cardNumber: e.target.value })}
-                          placeholder="1234 5678 9012 3456"
                           className="pl-8"
                         />
                       </div>
                     </Field>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Field label="Expiry" htmlFor="card-expiry">
+                        <Input
+                          id="card-expiry"
+                          placeholder="MM/YY"
+                          value={form.cardExpiry}
+                          onChange={(e) => set({ cardExpiry: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="CVV" htmlFor="card-cvv">
+                        <Input
+                          id="card-cvv"
+                          inputMode="numeric"
+                          placeholder="123"
+                          value={form.cardCvv}
+                          onChange={(e) => set({ cardCvv: e.target.value })}
+                        />
+                      </Field>
+                    </div>
                   </div>
-                  <Field label="Expiry" htmlFor="cardExpiry">
-                    <Input
-                      id="cardExpiry"
-                      value={form.cardExpiry}
-                      onChange={(e) => set({ cardExpiry: e.target.value })}
-                      placeholder="MM / YY"
-                    />
-                  </Field>
-                  <Field label="CVV" htmlFor="cardCvv">
-                    <Input
-                      id="cardCvv"
-                      inputMode="numeric"
-                      value={form.cardCvv}
-                      onChange={(e) => set({ cardCvv: e.target.value })}
-                      placeholder="123"
-                    />
-                  </Field>
-                </div>
-              ) : (
-                <div className="text-muted-foreground bg-muted/40 flex items-start gap-2 rounded-lg border border-dashed px-4 py-3 text-sm">
-                  <Building2 className="mt-0.5 size-4 shrink-0" />
-                  You&apos;ll pay the full amount at the property during your stay.
-                  A valid card may be required to guarantee the booking.
-                </div>
-              )}
-
-              <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                <Lock className="size-3.5" />
-                Your payment information is encrypted and secure.
-              </div>
-            </section>
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    {hotel.policies.payment}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           ) : null}
 
-          {step === 3 ? (
-            <section className="space-y-5">
-              <div>
-                <h2 className="font-heading text-xl font-semibold">
-                  Review &amp; Confirm
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  Please review your booking before confirming.
-                </p>
-              </div>
-
-              <Card>
-                <CardContent className="space-y-4">
-                  <ReviewRow label="Lead guest">
-                    {form.firstName || form.lastName
-                      ? `${form.firstName} ${form.lastName}`.trim()
-                      : "—"}
-                  </ReviewRow>
-                  <ReviewRow label="Contact">
-                    {form.email || "—"}
-                    {form.phone ? ` · ${form.phone}` : ""}
-                  </ReviewRow>
-                  <Separator />
-                  <ReviewRow label="Stay">
-                    {formatDate(checkIn)} → {formatDate(checkOut)} · {nights}{" "}
-                    {nightLabel}
-                  </ReviewRow>
-                  <ReviewRow label="Room">{room.name}</ReviewRow>
-                  <ReviewRow label="Guests">{guestsLabel}</ReviewRow>
-                  <ReviewRow label="Payment">
-                    {form.payMethod === "card" ? "Credit / Debit Card" : "Pay at Property"}
-                  </ReviewRow>
-                  {form.specialRequests ? (
-                    <ReviewRow label="Requests">{form.specialRequests}</ReviewRow>
+          {step === 4 ? (
+            <Card>
+              <CardContent className="space-y-5">
+                <h2 className="font-heading text-lg font-semibold">Review &amp; Confirm</h2>
+                <dl className="space-y-3 text-sm">
+                  <Row label="Lead guest">
+                    {form.firstName} {form.lastName}
+                  </Row>
+                  <Row label="Contact">
+                    {form.email} · {form.phone}
+                  </Row>
+                  <Row label="Country">{form.country}</Row>
+                  <Row label="Stay">
+                    {formatDate(checkIn)} → {formatDate(checkOut)} ({pricing.nights} {nightLabel})
+                  </Row>
+                  <Row label="Room">{room.name}</Row>
+                  <Row label="Guests">{guests}</Row>
+                  <Row label="Arrival">{form.arrivalTime}</Row>
+                  <Row label="Payment">
+                    {form.payMethod === "card" ? "Card — paid now" : "Pay at the property"}
+                  </Row>
+                  {addOns.length > 0 ? (
+                    <Row label="Extras">{addOns.map((a) => a.name).join(", ")}</Row>
                   ) : null}
-                </CardContent>
-              </Card>
+                  {form.specialRequests ? (
+                    <Row label="Requests">{form.specialRequests}</Row>
+                  ) : null}
+                </dl>
 
-              <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-                <Checkbox
-                  checked={form.agree}
-                  onCheckedChange={(v) => set({ agree: v === true })}
-                  className="mt-0.5"
-                />
-                <span className="text-muted-foreground">
-                  I agree to the{" "}
-                  <span className="text-foreground font-medium underline">
-                    Terms &amp; Conditions
-                  </span>{" "}
-                  and{" "}
-                  <span className="text-foreground font-medium underline">
-                    Cancellation Policy
+                <Separator />
+
+                <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+                  <Checkbox
+                    checked={form.agree}
+                    onCheckedChange={(v) => set({ agree: v === true })}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    I accept the terms &amp; conditions and the property&apos;s cancellation
+                    policy.
                   </span>
-                  .
-                </span>
-              </label>
-            </section>
+                </label>
+              </CardContent>
+            </Card>
           ) : null}
 
           {/* NAV */}
-          <div className="mt-8 flex items-center justify-between gap-3">
-            {step > 1 ? (
-              <Button variant="outline" onClick={back}>
-                <ArrowLeft className="size-4" />
-                Back
-              </Button>
-            ) : (
-              <span />
-            )}
-            {step < 3 ? (
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <Button variant="outline" onClick={back} disabled={step === 1}>
+              <ArrowLeft className="size-4" />
+              Back
+            </Button>
+            {step < steps.length ? (
               <Button onClick={next}>
                 Continue
                 <ArrowRight className="size-4" />
               </Button>
             ) : (
-              <Button size="lg" onClick={confirm}>
-                <ShieldCheck className="size-4" />
-                Confirm Booking · {formatCurrency(total)}
+              <Button size="lg" onClick={confirm} disabled={!stay.ok}>
+                Confirm Booking
               </Button>
             )}
           </div>
         </div>
 
-        {/* RIGHT — booking summary */}
+        {/* RIGHT — summary */}
         <div className="min-w-0">
-          <Card className="lg:sticky lg:top-24">
+          <Card className="overflow-hidden pt-0 lg:sticky lg:top-24">
+            <div className="relative h-36 w-full">
+              <Image
+                src={hotelImage(hotel.seed, 600, 400)}
+                alt={hotel.name}
+                fill
+                sizes="360px"
+                className="object-cover"
+              />
+            </div>
             <CardContent className="space-y-4">
-              <div className="flex gap-3">
-                <div className="bg-muted relative size-16 shrink-0 overflow-hidden rounded-lg">
-                  <Image
-                    src={hotelImage(hotel.seed, 160, 160)}
-                    alt={hotel.name}
-                    fill
-                    sizes="64px"
-                    className="object-cover"
-                  />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-heading truncate font-semibold">
-                    {hotel.name}
-                  </h3>
-                  <p className="text-muted-foreground flex items-center gap-1 text-sm">
-                    <MapPin className="size-3.5" />
-                    {hotel.city}, {hotel.country}
-                  </p>
-                  <Badge variant="secondary" className="mt-1">
-                    {hotel.type}
-                  </Badge>
-                </div>
+              <div>
+                <h3 className="font-heading font-semibold">{hotel.name}</h3>
+                <p className="text-muted-foreground flex items-center gap-1 text-sm">
+                  <MapPin className="size-3.5" />
+                  {hotel.city}, {hotel.country}
+                </p>
               </div>
 
               <Separator />
 
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <CalendarDays className="size-3.5" />
-                    Dates
-                  </span>
-                  <span className="font-medium">
-                    {formatDate(checkIn)} → {formatDate(checkOut)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground flex items-center gap-1.5">
-                    <Users className="size-3.5" />
-                    Guests
-                  </span>
-                  <span className="font-medium">{guestsLabel}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Room</span>
-                  <span className="font-medium">{room.name}</span>
-                </div>
+              <div className="space-y-1 text-sm">
+                <p className="font-medium">{room.name}</p>
+                <p className="text-muted-foreground">
+                  {formatDate(checkIn)} → {formatDate(checkOut)}
+                </p>
+                <p className="text-muted-foreground">
+                  {guests} {guests === 1 ? "guest" : "guests"} · {pricing.nights} {nightLabel}
+                </p>
               </div>
 
               <Separator />
@@ -474,33 +551,42 @@ export function CheckoutFlow({
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">
-                    {formatCurrency(room.pricePerNight)} × {nights} {nightLabel}
+                    {formatCurrency(pricing.ratePerNight)} × {pricing.nights} {nightLabel}
                   </span>
-                  <span className="font-medium">{formatCurrency(subtotal)}</span>
+                  <span className="font-medium">{formatCurrency(pricing.roomSubtotal)}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Taxes &amp; fees</span>
-                  <span className="font-medium">{formatCurrency(taxes)}</span>
-                </div>
+                {pricing.discount ? (
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                    <span>{pricing.discount.label}</span>
+                    <span className="font-medium">{formatCurrency(pricing.discount.amount)}</span>
+                  </div>
+                ) : null}
+                {addOns.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{a.name}</span>
+                    <span className="font-medium">{formatCurrency(a.price * a.qty)}</span>
+                  </div>
+                ))}
+                {/* Every charge the property configured, itemised — the old
+                    summary folded them into one flat 12% "Taxes & fees" line. */}
+                {pricing.taxes.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t.label}</span>
+                    <span className="font-medium">{formatCurrency(t.amount)}</span>
+                  </div>
+                ))}
                 <Separator />
                 <div className="flex items-center justify-between text-base">
                   <span className="font-heading font-semibold">Total</span>
                   <span className="font-heading font-semibold">
-                    {formatCurrency(total)}
+                    {formatCurrency(pricing.total)}
                   </span>
                 </div>
               </div>
 
-              <div className="text-muted-foreground flex items-start gap-2 text-sm">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span>
-                  <span className="text-foreground font-medium">
-                    Free Cancellation
-                  </span>
-                  <span className="block text-xs">
-                    Up to 24 hours before check-in
-                  </span>
-                </span>
+              <div className="text-muted-foreground flex items-start gap-2 text-xs">
+                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                {hotel.policies.cancellation}
               </div>
             </CardContent>
           </Card>
@@ -516,7 +602,7 @@ function Field({
   children,
 }: {
   label: string
-  htmlFor: string
+  htmlFor?: string
   children: React.ReactNode
 }) {
   return (
@@ -527,49 +613,11 @@ function Field({
   )
 }
 
-function PayOption({
-  value,
-  active,
-  icon,
-  title,
-  desc,
-}: {
-  value: string
-  active: boolean
-  icon: React.ReactNode
-  title: string
-  desc: string
-}) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label
-      className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors",
-        active ? "border-primary bg-primary/5" : "hover:bg-accent/50"
-      )}
-    >
-      <RadioGroupItem value={value} />
-      <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-full">
-        {icon}
-      </span>
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{title}</span>
-        <span className="text-muted-foreground block text-xs">{desc}</span>
-      </span>
-    </label>
-  )
-}
-
-function ReviewRow({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{children}</span>
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="max-w-[60%] text-right font-medium">{children}</dd>
     </div>
   )
 }

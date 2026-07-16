@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import Image from "next/image"
 import { MapPin } from "lucide-react"
@@ -5,12 +7,19 @@ import { MapPin } from "lucide-react"
 import type { Hotel } from "@/types"
 import { placeholderImage } from "@/lib/images"
 import { formatCurrency, formatNumber } from "@/lib/format"
+import { originalPrice } from "@/lib/domain"
+import { useHotelRating } from "@/store/selectors"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { StarRating } from "@/components/marketplace/star-rating"
+import { FavoriteButton } from "@/components/marketplace/favorite-button"
+import { DiscountBadge } from "@/components/marketplace/discount-badge"
 
 export function HotelCard({ hotel }: { hotel: Hotel }) {
+  const rating = useHotelRating(hotel.id)
+  const strikethrough = originalPrice(hotel)
+
   return (
     <Card className="group overflow-hidden pt-0">
       <div className="relative aspect-[16/10] w-full overflow-hidden">
@@ -24,9 +33,14 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
         <Badge className="absolute top-3 left-3" variant="secondary">
           {hotel.type}
         </Badge>
-        {hotel.discountLabel ? (
-          <Badge className="absolute top-3 right-3">{hotel.discountLabel}</Badge>
-        ) : null}
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {hotel.discount ? <DiscountBadge discount={hotel.discount} /> : null}
+          <FavoriteButton
+            hotelId={hotel.id}
+            hotelName={hotel.name}
+            className="bg-background/80 hover:bg-background"
+          />
+        </div>
       </div>
 
       <CardContent className="space-y-2">
@@ -38,17 +52,24 @@ export function HotelCard({ hotel }: { hotel: Hotel }) {
           {hotel.city}, {hotel.country}
         </p>
         <div className="flex items-center gap-2 text-sm">
-          <StarRating rating={hotel.rating} size="size-3.5" />
-          <span className="font-medium">{hotel.rating}</span>
-          <span className="text-muted-foreground">
-            ({formatNumber(hotel.reviewCount)} reviews)
-          </span>
+          {rating.reviewCount > 0 ? (
+            <>
+              <StarRating rating={rating.rating} size="size-3.5" />
+              <span className="font-medium">{rating.rating}</span>
+              <span className="text-muted-foreground">
+                ({formatNumber(rating.reviewCount)}{" "}
+                {rating.reviewCount === 1 ? "review" : "reviews"})
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground">No reviews yet</span>
+          )}
         </div>
         <div className="flex items-end justify-between pt-1">
           <div>
-            {hotel.originalPrice ? (
+            {strikethrough ? (
               <span className="text-muted-foreground mr-1 text-sm line-through">
-                {formatCurrency(hotel.originalPrice)}
+                {formatCurrency(strikethrough)}
               </span>
             ) : null}
             <span className="font-heading text-lg font-semibold">
