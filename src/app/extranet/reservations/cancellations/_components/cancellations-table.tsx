@@ -3,10 +3,14 @@
 import * as React from "react"
 import { Search } from "lucide-react"
 
-import { cancellations } from "@/data/extranet"
+import type { RefundStatus } from "@/types"
 import { cellPad } from "@/lib/extranet/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
-import { StatusPill } from "@/components/extranet/shared"
+import { guestName } from "@/lib/domain"
+import { refundStatusLabel } from "@/lib/labels"
+import { usePartnerCancellations } from "@/store/selectors"
+import { RefundBadge } from "@/components/shared/status-badge"
+import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
@@ -25,25 +29,44 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const reasons = ["all", ...new Set(cancellations.map((c) => c.reason))]
-const statuses = ["all", ...new Set(cancellations.map((c) => c.refundStatus))]
+const refundItems = [
+  { value: "all", label: "All refund states" },
+  ...(["full", "partial", "none", "pending", "processed"] as RefundStatus[]).map((s) => ({
+    value: s,
+    label: refundStatusLabel[s],
+  })),
+]
 
+const byItems = [
+  { value: "all", label: "Cancelled by anyone" },
+  { value: "guest", label: "Cancelled by guest" },
+  { value: "hotel", label: "Cancelled by hotel" },
+]
+
+/**
+ * Cancellations are bookings with `status: cancelled` — not a separate list.
+ * A cancellation made in the dashboard or on the reservations screen lands here
+ * on its own; the two used to be unrelated datasets that shared no ids.
+ */
 export function CancellationsTable() {
+  const cancellations = usePartnerCancellations()
   const [query, setQuery] = React.useState("")
-  const [reason, setReason] = React.useState("all")
+  const [by, setBy] = React.useState("all")
   const [status, setStatus] = React.useState("all")
 
   const filtered = cancellations.filter((c) => {
     const q = query.trim().toLowerCase()
     const matchesQuery =
       !q ||
-      c.guest.toLowerCase().includes(q) ||
+      guestName(c).toLowerCase().includes(q) ||
       c.id.toLowerCase().includes(q) ||
-      c.reason.toLowerCase().includes(q)
-    const matchesReason = reason === "all" || c.reason === reason
-    const matchesStatus = status === "all" || c.refundStatus === status
-    return matchesQuery && matchesReason && matchesStatus
+      (c.cancellation?.reason ?? "").toLowerCase().includes(q)
+    const matchesBy = by === "all" || c.cancellation?.by === by
+    const matchesStatus = status === "all" || c.cancellation?.refundStatus === status
+    return matchesQuery && matchesBy && matchesStatus
   })
+
+  const refunded = filtered.reduce((sum, c) => sum + (c.cancellation?.refund ?? 0), 0)
 
   return (
     <div className="space-y-4">
@@ -58,26 +81,26 @@ export function CancellationsTable() {
             className="h-9 pl-8"
           />
         </div>
-        <Select value={reason} onValueChange={(v) => setReason(String(v))}>
-          <SelectTrigger className="h-9 w-full sm:w-56">
+        <Select items={byItems} value={by} onValueChange={(v) => setBy(String(v))}>
+          <SelectTrigger className="h-9 w-full sm:w-52">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {reasons.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r === "all" ? "All Reasons" : r}
+            {byItems.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Select value={status} onValueChange={(v) => setStatus(String(v))}>
-          <SelectTrigger className="h-9 w-full sm:w-40">
+        <Select items={refundItems} value={status} onValueChange={(v) => setStatus(String(v))}>
+          <SelectTrigger className="h-9 w-full sm:w-52">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {statuses.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s === "all" ? "All" : s}
+            {refundItems.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -85,63 +108,73 @@ export function CancellationsTable() {
       </div>
 
       <Card className="py-0">
-        <Table className={cellPad}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reservation ID</TableHead>
-              <TableHead>Guest</TableHead>
-              <TableHead>Room</TableHead>
-              <TableHead>Original Dates</TableHead>
-              <TableHead>Cancelled</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>By</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="text-right">Refund</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.id}</TableCell>
-                <TableCell>{c.guest}</TableCell>
-                <TableCell>{c.room}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {c.originalDates}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(c.cancelledOn)}
-                </TableCell>
-                <TableCell>{c.reason}</TableCell>
-                <TableCell>{c.by}</TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(c.total)}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(c.refund)}
-                </TableCell>
-                <TableCell>
-                  <StatusPill status={c.refundStatus} />
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 ? (
+        <div className="overflow-x-auto">
+          <Table className={cellPad}>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="text-muted-foreground py-10 text-center"
-                >
-                  No cancellations match your filters.
-                </TableCell>
+                <TableHead>Reservation ID</TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead>Property</TableHead>
+                <TableHead>Room</TableHead>
+                <TableHead>Original dates</TableHead>
+                <TableHead>Cancelled on</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>By</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Refund</TableHead>
+                <TableHead>Refund status</TableHead>
               </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell className="font-medium">{c.id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{guestName(c)}</div>
+                    <div className="text-muted-foreground text-xs">{c.guest.email}</div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{c.hotelName}</TableCell>
+                  <TableCell>{c.roomName}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(c.checkIn)} → {formatDate(c.checkOut)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {c.cancellation ? formatDate(c.cancellation.date) : "—"}
+                  </TableCell>
+                  <TableCell className="max-w-56">
+                    <span className="line-clamp-2">{c.cancellation?.reason ?? "—"}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {c.cancellation?.by ?? "—"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(c.pricing.total)}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(c.cancellation?.refund ?? 0)}
+                  </TableCell>
+                  <TableCell>
+                    {c.cancellation ? <RefundBadge status={c.cancellation.refundStatus} /> : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-muted-foreground py-10 text-center">
+                    No cancellations match these filters.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       <p className="text-muted-foreground text-sm">
-        Showing {filtered.length} of {cancellations.length} cancelled
-        reservations
+        {filtered.length} {filtered.length === 1 ? "cancellation" : "cancellations"} ·{" "}
+        {formatCurrency(refunded)} refunded
       </p>
     </div>
   )

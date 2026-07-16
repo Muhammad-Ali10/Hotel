@@ -1,13 +1,12 @@
+"use client"
+
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 
-import {
-  pendingActions,
-  reservations,
-  tips,
-  upcomingCheckIns,
-} from "@/data/extranet"
+import { pendingActions, tips } from "@/data/extranet"
 import { formatDate } from "@/lib/format"
+import { guestName, nightsBetween, toISODate } from "@/lib/domain"
+import { usePartnerReservations } from "@/store/selectors"
 import {
   ActionButton,
   ConfirmDialog,
@@ -30,6 +29,8 @@ const cellPad =
   "[&_th]:px-4 [&_td]:px-4 [&_th:first-child]:pl-5 [&_td:first-child]:pl-5 [&_th:last-child]:pr-5 [&_td:last-child]:pr-5"
 
 export function RecentReservations() {
+  const reservations = usePartnerReservations()
+
   return (
     <SectionCard
       title="Recent Reservations"
@@ -58,13 +59,13 @@ export function RecentReservations() {
             <TableRow key={r.id}>
               <TableCell className="font-medium">{r.id}</TableCell>
               <TableCell>
-                <div className="font-medium">{r.guest}</div>
+                <div className="font-medium">{guestName(r)}</div>
                 <div className="text-muted-foreground text-xs">{r.source}</div>
               </TableCell>
               <TableCell>
-                <div>{r.room}</div>
+                <div>{r.roomName}</div>
                 <div className="text-muted-foreground text-xs">
-                  Room {r.roomNo}
+                  {r.roomNo ? `Room ${r.roomNo}` : r.hotelName}
                 </div>
               </TableCell>
               <TableCell className="text-muted-foreground">
@@ -75,13 +76,28 @@ export function RecentReservations() {
               </TableCell>
             </TableRow>
           ))}
+          {reservations.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-muted-foreground py-8 text-center">
+                No reservations yet.
+              </TableCell>
+            </TableRow>
+          ) : null}
         </TableBody>
       </Table>
     </SectionCard>
   )
 }
 
+/** Derived from the reservation list rather than a hand-written side table, so
+ *  the guests named here are guests who actually have a booking. */
 export function UpcomingCheckIns() {
+  const reservations = usePartnerReservations()
+  const today = toISODate(new Date())
+  const checkIns = reservations
+    .filter((r) => r.status === "confirmed" && r.checkIn >= today)
+    .slice(0, 6)
+
   return (
     <SectionCard
       title="Upcoming Check-ins"
@@ -95,22 +111,26 @@ export function UpcomingCheckIns() {
       }
     >
       <ul className="divide-y">
-        {upcomingCheckIns.map((c) => (
+        {checkIns.map((c) => (
           <li
-            key={c.guest}
+            key={c.id}
             className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
           >
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{c.guest}</p>
+              <p className="truncate text-sm font-medium">{guestName(c)}</p>
               <p className="text-muted-foreground truncate text-xs">
-                #{c.roomNo} · {c.room}
+                {c.roomNo ? `#${c.roomNo} · ` : ""}
+                {c.roomName}
               </p>
             </div>
             <Badge variant="secondary" className="shrink-0">
-              {c.inDays}d
+              {nightsBetween(today, c.checkIn)}d
             </Badge>
           </li>
         ))}
+        {checkIns.length === 0 ? (
+          <li className="text-muted-foreground py-3 text-sm">No arrivals scheduled.</li>
+        ) : null}
       </ul>
     </SectionCard>
   )

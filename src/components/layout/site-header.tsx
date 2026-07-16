@@ -15,6 +15,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/layout/mode-toggle"
+import { NotificationBell } from "@/components/shared/notification-bell"
 
 export function SiteHeader() {
   const [open, setOpen] = React.useState(false)
@@ -48,11 +49,14 @@ export function SiteHeader() {
             <span className="flex items-center gap-1">
               <Globe className="size-4" /> EN
             </span>
-            <span>PKR</span>
+            {/* Every price on the site is formatted in USD; this label used to
+                say PKR. */}
+            <span>USD</span>
             <Link href="/support" className="hover:text-foreground">
               Help
             </Link>
           </div>
+          <NotificationBell audience="customer" href="/dashboard/notifications" />
           <ModeToggle />
           <div className="hidden items-center gap-2 sm:flex">
             <Button

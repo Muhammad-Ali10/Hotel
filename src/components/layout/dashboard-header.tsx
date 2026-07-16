@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sheet"
 import { ModeToggle } from "@/components/layout/mode-toggle"
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar"
+import { NotificationBell } from "@/components/shared/notification-bell"
 
 export function DashboardHeader() {
   const [open, setOpen] = React.useState(false)
@@ -66,14 +67,17 @@ export function DashboardHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <NotificationBell audience="customer" href="/dashboard/notifications" />
           <ModeToggle />
+          {/* The dashboard is a signed-in surface — it used to offer Login and
+              Register to a user who was already signed in. */}
           <Button
             variant="ghost"
             size="sm"
             className="hidden sm:inline-flex"
-            render={<Link href="/login">Login</Link>}
+            render={<Link href="/dashboard/profile">My Profile</Link>}
           />
-          <Button size="sm" render={<Link href="/signup">Register</Link>} />
+          <Button variant="outline" size="sm" render={<Link href="/">Sign Out</Link>} />
         </div>
       </div>
     </header>

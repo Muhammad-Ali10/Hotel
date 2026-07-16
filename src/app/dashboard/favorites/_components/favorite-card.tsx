@@ -2,16 +2,19 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Heart, MapPin } from "lucide-react"
-import { toast } from "sonner"
+import { MapPin } from "lucide-react"
 
 import type { Hotel } from "@/types"
 import { placeholderImage } from "@/lib/images"
-import { formatCurrency } from "@/lib/format"
-import { Button } from "@/components/ui/button"
+import { formatCurrency, formatNumber } from "@/lib/format"
+import { useHotelRating } from "@/store/selectors"
 import { Card, CardContent } from "@/components/ui/card"
+import { StarRating } from "@/components/marketplace/star-rating"
+import { FavoriteButton } from "@/components/marketplace/favorite-button"
 
 export function FavoriteCard({ hotel }: { hotel: Hotel }) {
+  const rating = useHotelRating(hotel.id)
+
   return (
     <Card className="group overflow-hidden pt-0">
       <div className="relative aspect-[16/10] w-full overflow-hidden">
@@ -22,15 +25,12 @@ export function FavoriteCard({ hotel }: { hotel: Hotel }) {
           sizes="(max-width: 768px) 100vw, 300px"
           className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <Button
-          size="icon"
-          variant="secondary"
-          aria-label="Remove from saved"
-          onClick={() => toast.success("Removed from saved")}
-          className="absolute top-3 right-3 rounded-full shadow-sm"
-        >
-          <Heart className="size-4 fill-current" />
-        </Button>
+        {/* Un-saving here removes the card — the heart used to only toast. */}
+        <FavoriteButton
+          hotelId={hotel.id}
+          hotelName={hotel.name}
+          className="bg-background/80 hover:bg-background absolute top-3 right-3"
+        />
       </div>
 
       <CardContent className="space-y-2">
@@ -43,6 +43,15 @@ export function FavoriteCard({ hotel }: { hotel: Hotel }) {
           <MapPin className="size-3.5" />
           {hotel.city}, {hotel.country}
         </p>
+        {rating.reviewCount > 0 ? (
+          <p className="flex items-center gap-1.5 text-sm">
+            <StarRating rating={rating.rating} size="size-3.5" />
+            <span className="font-medium">{rating.rating}</span>
+            <span className="text-muted-foreground">
+              ({formatNumber(rating.reviewCount)})
+            </span>
+          </p>
+        ) : null}
         <p className="text-sm">
           <span className="font-heading text-lg font-semibold">
             {formatCurrency(hotel.pricePerNight)}

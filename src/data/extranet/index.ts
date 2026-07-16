@@ -1,7 +1,6 @@
 // Mock data for the Stayora partner extranet. Imported via "@/data/extranet"
 // (kept separate from the marketplace "@/data" to avoid name clashes).
 export * from "./properties"
-export * from "./reservations"
 export * from "./dashboard"
 export * from "./operations"
 export * from "./promotions-detail"

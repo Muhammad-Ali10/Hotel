@@ -1,20 +1,8 @@
 import { Download, Settings2 } from "lucide-react"
 
-import type { Stat } from "@/lib/extranet/types"
-import { reviewStats } from "@/data/extranet"
-import { ActionButton, PageHeader, StatGrid } from "@/components/extranet/shared"
+import { ActionButton, PageHeader } from "@/components/extranet/shared"
 import { ReviewsList } from "./_components/reviews-list"
-
-const fiveStarPct = Math.round((reviewStats.fiveStar / reviewStats.total) * 100)
-
-const stats: Stat[] = [
-  { label: "Total Reviews", value: String(reviewStats.total) },
-  { label: "Avg. Rating", value: `${reviewStats.avgRating} / 5` },
-  { label: "Pending Review", value: String(reviewStats.pending) },
-  { label: "Response Rate", value: `${reviewStats.responseRate}%` },
-  { label: "5-Star Reviews", value: `${reviewStats.fiveStar} (${fiveStarPct}%)` },
-  { label: "Flagged", value: String(reviewStats.flagged) },
-]
+import { ReviewsStats } from "./_components/reviews-stats"
 
 export default function ReviewsPage() {
   return (
@@ -43,7 +31,7 @@ export default function ReviewsPage() {
         </ActionButton>
       </PageHeader>
 
-      <StatGrid stats={stats} className="sm:grid-cols-3 lg:grid-cols-6" />
+      <ReviewsStats />
 
       <ReviewsList />
     </div>

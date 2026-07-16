@@ -4,11 +4,14 @@ import * as React from "react"
 import { MoreVertical, Search } from "lucide-react"
 import { toast } from "sonner"
 
-import type { Reservation } from "@/lib/extranet/types"
-import { reservations } from "@/data/extranet"
+import type { Booking, BookingStatus } from "@/types"
 import { cellPad } from "@/lib/extranet/constants"
 import { formatCurrency, formatDate } from "@/lib/format"
-import { StatusPill } from "@/components/extranet/shared"
+import { guestName } from "@/lib/domain"
+import { bookingStatusLabel } from "@/lib/labels"
+import { useStore } from "@/store"
+import { usePartnerReservations } from "@/store/selectors"
+import { StatusBadge } from "@/components/shared/status-badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -45,26 +48,45 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-const statuses = ["all", ...new Set(reservations.map((r) => r.status))]
-const sources = ["all", ...new Set(reservations.map((r) => r.source))]
 const PAGE_SIZE = 10
 
+const statusItems = [
+  { value: "all", label: "All Statuses" },
+  ...(
+    ["confirmed", "pending", "checked_in", "checked_out", "completed"] as BookingStatus[]
+  ).map((s) => ({ value: s, label: bookingStatusLabel[s] })),
+]
+
+const sourceItems = [
+  { value: "all", label: "All Sources" },
+  ...["Direct", "Booking.com", "Expedia", "Travel Agency"].map((s) => ({
+    value: s,
+    label: s,
+  })),
+]
+
+/**
+ * The partner's reservation list — the same bookings the guests made on the
+ * public site, not a parallel dataset. A booking taken through checkout shows
+ * up here, and a cancellation here reaches the guest's dashboard.
+ */
 export function ReservationsTable() {
+  const reservations = usePartnerReservations()
   const [query, setQuery] = React.useState("")
   const [status, setStatus] = React.useState("all")
   const [source, setSource] = React.useState("all")
   const [date, setDate] = React.useState("")
   const [page, setPage] = React.useState(1)
-  const [selected, setSelected] = React.useState<Reservation | null>(null)
-  const [cancelling, setCancelling] = React.useState<Reservation | null>(null)
+  const [selected, setSelected] = React.useState<Booking | null>(null)
+  const [cancelling, setCancelling] = React.useState<Booking | null>(null)
 
   const filtered = reservations.filter((r) => {
     const q = query.trim().toLowerCase()
     const matchesQuery =
       !q ||
-      r.guest.toLowerCase().includes(q) ||
+      guestName(r).toLowerCase().includes(q) ||
       r.id.toLowerCase().includes(q) ||
-      r.room.toLowerCase().includes(q)
+      r.roomName.toLowerCase().includes(q)
     const matchesStatus = status === "all" || r.status === status
     const matchesSource = source === "all" || r.source === source
     const matchesDate = !date || r.checkIn === date
@@ -75,10 +97,7 @@ export function ReservationsTable() {
   const currentPage = Math.min(page, totalPages)
   const start = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
   const end = Math.min(currentPage * PAGE_SIZE, filtered.length)
-  const visible = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  )
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
     <div className="space-y-4">
@@ -97,6 +116,7 @@ export function ReservationsTable() {
           />
         </div>
         <Select
+          items={statusItems}
           value={status}
           onValueChange={(v) => {
             setStatus(String(v))
@@ -107,14 +127,15 @@ export function ReservationsTable() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {statuses.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s === "all" ? "All Statuses" : s}
+            {statusItems.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Select
+          items={sourceItems}
           value={source}
           onValueChange={(v) => {
             setSource(String(v))
@@ -125,9 +146,9 @@ export function ReservationsTable() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {sources.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s === "all" ? "All Sources" : s}
+            {sourceItems.map((s) => (
+              <SelectItem key={s.value} value={s.value}>
+                {s.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -145,281 +166,274 @@ export function ReservationsTable() {
       </div>
 
       <Card className="py-0">
-        <Table className={cellPad}>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Reservation ID</TableHead>
-              <TableHead>Guest</TableHead>
-              <TableHead>Room</TableHead>
-              <TableHead>Check-in</TableHead>
-              <TableHead>Check-out</TableHead>
-              <TableHead className="text-center">Guests</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((r) => (
-              <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.id}</TableCell>
-                <TableCell>
-                  <div className="font-medium">{r.guest}</div>
-                  <div className="text-muted-foreground text-xs">{r.email}</div>
-                </TableCell>
-                <TableCell>
-                  <div>{r.room}</div>
-                  <div className="text-muted-foreground text-xs">
-                    Room {r.roomNo}
-                  </div>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(r.checkIn)}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(r.checkOut)}
-                </TableCell>
-                <TableCell className="text-center">{r.guests}</TableCell>
-                <TableCell>{r.source}</TableCell>
-                <TableCell>
-                  <StatusPill status={r.status} />
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(r.total)}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Actions"
-                        >
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end" className="w-40">
-                      <DropdownMenuItem onClick={() => setSelected(r)}>
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => setCancelling(r)}
-                      >
-                        Cancel Booking
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 ? (
+        <div className="overflow-x-auto">
+          <Table className={cellPad}>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="text-muted-foreground py-10 text-center"
-                >
-                  No reservations match your filters.
-                </TableCell>
+                <TableHead>Reservation ID</TableHead>
+                <TableHead>Guest</TableHead>
+                <TableHead>Property</TableHead>
+                <TableHead>Room</TableHead>
+                <TableHead>Check-in</TableHead>
+                <TableHead>Check-out</TableHead>
+                <TableHead className="text-center">Guests</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {visible.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.id}</TableCell>
+                  <TableCell>
+                    <div className="font-medium">{guestName(r)}</div>
+                    <div className="text-muted-foreground text-xs">{r.guest.email}</div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{r.hotelName}</TableCell>
+                  <TableCell>
+                    <div>{r.roomName}</div>
+                    {r.roomNo ? (
+                      <div className="text-muted-foreground text-xs">Room {r.roomNo}</div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(r.checkIn)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(r.checkOut)}
+                  </TableCell>
+                  <TableCell className="text-center">{r.guests}</TableCell>
+                  <TableCell>{r.source}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={r.status} />
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(r.pricing.total)}
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button variant="ghost" size="icon-sm" aria-label="Actions">
+                            <MoreVertical className="size-4" />
+                          </Button>
+                        }
+                      />
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem onClick={() => setSelected(r)}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem variant="destructive" onClick={() => setCancelling(r)}>
+                          Cancel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {visible.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-muted-foreground py-10 text-center">
+                    No reservations match these filters.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
-      <div className="flex items-center justify-between gap-4">
+      {/* Pagination */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted-foreground text-sm">
-          Showing {start} – {end} of {filtered.length} results
+          Showing {start}–{end} of {filtered.length}
         </p>
-        {totalPages > 1 ? (
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <Button
-                key={p}
-                variant={p === currentPage ? "default" : "outline"}
-                size="icon-sm"
-                onClick={() => setPage(p)}
-                aria-label={`Page ${p}`}
-                aria-current={p === currentPage ? "page" : undefined}
-              >
-                {p}
-              </Button>
-            ))}
-          </div>
-        ) : null}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
+        </div>
       </div>
 
-      <ReservationDialog
-        reservation={selected}
-        onClose={() => setSelected(null)}
-      />
-
-      <CancelDialog
-        key={cancelling?.id ?? "none"}
-        reservation={cancelling}
-        onClose={() => setCancelling(null)}
-      />
+      {selected ? (
+        <DetailsDialog booking={selected} onClose={() => setSelected(null)} />
+      ) : null}
+      {cancelling ? (
+        <CancelDialog booking={cancelling} onClose={() => setCancelling(null)} />
+      ) : null}
     </div>
   )
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailsDialog({ booking, onClose }: { booking: Booking; onClose: () => void }) {
+  const assignRoomNo = useStore((s) => s.assignRoomNo)
+  const setBookingStatus = useStore((s) => s.setBookingStatus)
+  const [roomNo, setRoomNo] = React.useState(booking.roomNo ?? "")
+
   return (
-    <div className="space-y-0.5">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="text-sm font-medium">{value}</p>
-    </div>
-  )
-}
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{booking.id}</DialogTitle>
+          <DialogDescription>
+            {booking.hotelName} · booked {formatDate(booking.createdAt)}
+          </DialogDescription>
+        </DialogHeader>
 
-function ReservationDialog({
-  reservation,
-  onClose,
-}: {
-  reservation: Reservation | null
-  onClose: () => void
-}) {
-  return (
-    <Dialog open={!!reservation} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        {reservation ? (
-          <>
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <DialogTitle>Reservation Details</DialogTitle>
-                <StatusPill status={reservation.status} />
-              </div>
-              <DialogDescription>{reservation.id}</DialogDescription>
-            </DialogHeader>
+        <dl className="space-y-3 text-sm">
+          <Row label="Guest">{guestName(booking)}</Row>
+          <Row label="Email">{booking.guest.email}</Row>
+          {/* Checkout collects a phone number and a country; this panel used to
+              show neither, while showing a room number nobody had entered. */}
+          <Row label="Phone">{booking.guest.phone}</Row>
+          <Row label="Country">{booking.guest.country}</Row>
+          <Row label="Room">{booking.roomName}</Row>
+          <Row label="Stay">
+            {formatDate(booking.checkIn)} → {formatDate(booking.checkOut)} (
+            {booking.pricing.nights} nights)
+          </Row>
+          <Row label="Guests">{booking.guests}</Row>
+          <Row label="Estimated arrival">{booking.arrivalTime}</Row>
+          <Row label="Source">{booking.source}</Row>
+          <Row label="Payment">
+            {booking.payment.method === "card" ? "Card — paid" : "Pay at property"}
+          </Row>
+          {booking.addOns.length > 0 ? (
+            <Row label="Extras">
+              {booking.addOns.map((a) => `${a.name} (${formatCurrency(a.price * a.qty)})`).join(", ")}
+            </Row>
+          ) : null}
+          {booking.specialRequests ? (
+            <Row label="Guest requests">{booking.specialRequests}</Row>
+          ) : null}
+          {booking.notes ? <Row label="Internal note">{booking.notes}</Row> : null}
+          <Row label="Total">{formatCurrency(booking.pricing.total)}</Row>
+        </dl>
 
-            <div className="space-y-5">
-              <section className="space-y-3">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Guest Information
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Name" value={reservation.guest} />
-                  <Field label="Email" value={reservation.email} />
-                  <Field label="Guests" value={reservation.guests} />
-                  <Field label="Source" value={reservation.source} />
-                </div>
-              </section>
+        <div className="space-y-1.5">
+          <Label htmlFor="room-no">Assign room number</Label>
+          <div className="flex gap-2">
+            <Input
+              id="room-no"
+              value={roomNo}
+              onChange={(e) => setRoomNo(e.target.value)}
+              placeholder="e.g. 1204"
+              className="h-9"
+            />
+            <Button
+              size="sm"
+              onClick={() => {
+                assignRoomNo(booking.id, roomNo)
+                toast.success(`Room ${roomNo} assigned to ${booking.id}.`)
+              }}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
 
-              <section className="space-y-3 border-t pt-4">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Stay Details
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Property" value={reservation.property} />
-                  <Field
-                    label="Room"
-                    value={`${reservation.room} (#${reservation.roomNo})`}
-                  />
-                  <Field
-                    label="Check-in"
-                    value={formatDate(reservation.checkIn)}
-                  />
-                  <Field
-                    label="Check-out"
-                    value={formatDate(reservation.checkOut)}
-                  />
-                </div>
-              </section>
-
-              <section className="space-y-3 border-t pt-4">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Payment
-                </h3>
-                <div className="flex items-end justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-muted-foreground text-xs">Total Amount</p>
-                    <span className="font-heading text-2xl font-semibold">
-                      {formatCurrency(reservation.total)}
-                    </span>
-                  </div>
-                  <span className="text-muted-foreground text-xs">
-                    Created {formatDate(reservation.createdAt)}
-                  </span>
-                </div>
-              </section>
-
-              <section className="space-y-2 border-t pt-4">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  Notes
-                </h3>
-                <p className="text-muted-foreground text-sm">
-                  {reservation.notes}
-                </p>
-              </section>
-            </div>
-
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
-                Close
-              </DialogClose>
-            </DialogFooter>
-          </>
-        ) : null}
+        <DialogFooter>
+          {booking.status === "confirmed" ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBookingStatus(booking.id, "checked_in")
+                toast.success(`${guestName(booking)} checked in.`)
+                onClose()
+              }}
+            >
+              Check in
+            </Button>
+          ) : null}
+          {booking.status === "checked_in" ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBookingStatus(booking.id, "checked_out")
+                toast.success(`${guestName(booking)} checked out.`)
+                onClose()
+              }}
+            >
+              Check out
+            </Button>
+          ) : null}
+          <DialogClose render={<Button>Close</Button>} />
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
 
-function CancelDialog({
-  reservation,
-  onClose,
-}: {
-  reservation: Reservation | null
-  onClose: () => void
-}) {
-  // Fresh state per target: the parent remounts this via `key`.
+function CancelDialog({ booking, onClose }: { booking: Booking; onClose: () => void }) {
+  const cancelBooking = useStore((s) => s.cancelBooking)
   const [reason, setReason] = React.useState("")
 
   return (
-    <Dialog open={!!reservation} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
-        {reservation ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Cancel Booking</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to cancel reservation {reservation.id} for{" "}
-                {reservation.guest}?
-              </DialogDescription>
-            </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Cancel {booking.id}?</DialogTitle>
+          <DialogDescription>
+            {guestName(booking)} will be notified and refunded under the property&apos;s
+            cancellation policy.
+          </DialogDescription>
+        </DialogHeader>
 
-            <div className="space-y-2">
-              <Label htmlFor="cancellation-reason">Cancellation Reason</Label>
-              <Textarea
-                id="cancellation-reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Enter the reason for cancellation…"
-                rows={3}
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="cancel-reason">Reason</Label>
+          <Textarea
+            id="cancel-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            placeholder="Why is the property cancelling this reservation?"
+          />
+        </div>
 
-            <DialogFooter>
-              <DialogClose render={<Button variant="outline" />}>
-                Keep Reservation
-              </DialogClose>
-              <Button
-                variant="destructive"
-                disabled={!reason.trim()}
-                onClick={() => {
-                  toast.success(`Reservation ${reservation.id} cancelled`)
-                  onClose()
-                }}
-              >
-                Confirm Cancellation
-              </Button>
-            </DialogFooter>
-          </>
-        ) : null}
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline">Keep reservation</Button>} />
+          <Button
+            variant="destructive"
+            onClick={() => {
+              if (!reason.trim()) {
+                toast.error("Please give a reason for the cancellation.")
+                return
+              }
+              // Writes the cancellation to the shared booking — it now appears
+              // on the Cancellations screen and in the guest's dashboard.
+              cancelBooking(booking.id, reason.trim(), "hotel")
+              toast.success(`${booking.id} cancelled.`)
+              onClose()
+            }}
+          >
+            Confirm cancellation
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-2">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="max-w-[60%] text-right font-medium">{children}</dd>
+    </div>
   )
 }

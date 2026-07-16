@@ -3,8 +3,8 @@
 import * as React from "react"
 import { toast } from "sonner"
 
-import type { ReviewStatus } from "@/lib/extranet/types"
-import { ActionButton, ConfirmDialog } from "@/components/extranet/shared"
+import type { Review } from "@/types"
+import { useStore } from "@/store"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,25 +18,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-export function ReviewActions({
-  guest,
-  status,
-}: {
-  guest: string
-  status: ReviewStatus
-}) {
+/** Every action here writes to the shared review — the buttons used to fire a
+ *  toast and leave the review exactly as it was. */
+export function ReviewActions({ review }: { review: Review }) {
+  const replyToReview = useStore((s) => s.replyToReview)
+  const setReviewStatus = useStore((s) => s.setReviewStatus)
   const [open, setOpen] = React.useState(false)
-  const [reply, setReply] = React.useState("")
+  const [reply, setReply] = React.useState(review.response?.text ?? "")
 
-  const showModeration = status === "Pending"
+  const needsModeration = review.status === "pending" || review.status === "flagged"
 
   return (
-    <div className="flex gap-2 pt-1">
+    <div className="flex flex-wrap gap-2 pt-1">
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger render={<Button size="sm">Reply</Button>} />
+        <DialogTrigger
+          render={
+            <Button size="sm" variant={review.response ? "outline" : "default"}>
+              {review.response ? "Edit reply" : "Reply"}
+            </Button>
+          }
+        />
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reply to {guest}</DialogTitle>
+            <DialogTitle>Reply to {review.author}</DialogTitle>
           </DialogHeader>
           <div className="space-y-1.5">
             <Label htmlFor="review-reply">Your response</Label>
@@ -47,16 +51,17 @@ export function ReviewActions({
               placeholder="Write a public response to this review…"
               className="min-h-28"
             />
+            <p className="text-muted-foreground text-xs">
+              This appears publicly under the review on your hotel page.
+            </p>
           </div>
           <DialogFooter>
-            <DialogClose render={<Button variant="outline" />}>
-              Cancel
-            </DialogClose>
+            <DialogClose render={<Button variant="outline">Cancel</Button>} />
             <Button
               disabled={!reply.trim()}
               onClick={() => {
-                toast.success("Reply posted")
-                setReply("")
+                replyToReview(review.id, reply.trim())
+                toast.success("Reply posted — it's now live on your hotel page.")
                 setOpen(false)
               }}
             >
@@ -66,29 +71,42 @@ export function ReviewActions({
         </DialogContent>
       </Dialog>
 
-      {showModeration ? (
+      {needsModeration ? (
         <>
-          <ActionButton
+          <Button
             variant="outline"
             size="sm"
-            toastMessage="Review approved"
-            toastType="success"
+            onClick={() => {
+              setReviewStatus(review.id, "published")
+              toast.success("Review approved — it's now visible to guests.")
+            }}
           >
             Approve
-          </ActionButton>
-          <ConfirmDialog
-            trigger={
-              <Button variant="ghost" size="sm">
-                Reject
-              </Button>
-            }
-            title="Reject review"
-            description="This review will be hidden from your public listings. This action cannot be undone."
-            confirmLabel="Reject"
-            destructive
-            toastMessage="Review rejected"
-          />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setReviewStatus(review.id, "rejected")
+              toast.success("Review rejected — it's hidden from your listing.")
+            }}
+          >
+            Reject
+          </Button>
         </>
+      ) : null}
+
+      {review.status === "published" ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setReviewStatus(review.id, "flagged")
+            toast.success("Review flagged for moderation.")
+          }}
+        >
+          Flag
+        </Button>
       ) : null}
     </div>
   )

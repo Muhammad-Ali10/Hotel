@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/card"
 import { SupportSearch } from "./_components/support-search"
 import { SupportTicketForm } from "./_components/support-ticket-form"
+import { MyTickets } from "./_components/my-tickets"
 import { HotelMessageForm } from "./_components/hotel-message-form"
 
 export const metadata: Metadata = {
@@ -138,7 +139,7 @@ const faqs: { question: string; answer: string }[] = [
   {
     question: "How do I earn and redeem reward points?",
     answer:
-      "You earn Stayora reward points on every completed stay. Points accrue automatically to your account and can be redeemed for discounts on future bookings from the Rewards page in your dashboard.",
+      "You earn Stayora reward points on every completed stay. Points accrue automatically and are shown on your dashboard, where they are applied as a discount at checkout on future bookings.",
   },
   {
     question: "Can I request early check-in or late check-out?",
@@ -169,7 +170,7 @@ const faqs: { question: string; answer: string }[] = [
 
 export default function SupportPage() {
   return (
-    <div className="luxestay-support">
+    <div className="stayora-support">
       {/* HERO */}
       <section
         id="about"
@@ -292,6 +293,12 @@ export default function SupportPage() {
                 <SupportTicketForm />
               </CardContent>
             </Card>
+
+            {/* Submitted tickets — the form had nowhere to submit to before */}
+            <div className="space-y-3">
+              <h2 className="font-heading text-lg font-semibold">My Tickets</h2>
+              <MyTickets />
+            </div>
 
             <Card>
               <CardHeader>
