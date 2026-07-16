@@ -3,7 +3,7 @@ import { ChevronLeft } from "lucide-react"
 
 import { PageHeader } from "@/components/extranet/shared"
 import { Button } from "@/components/ui/button"
-import { DescriptionsList } from "./_components/descriptions-view"
+import { DescriptionsView } from "./_components/descriptions-view"
 
 export default function DescriptionsPage() {
   return (
@@ -22,7 +22,7 @@ export default function DescriptionsPage() {
         </Button>
       </PageHeader>
 
-      <DescriptionsList />
+      <DescriptionsView />
     </div>
   )
 }

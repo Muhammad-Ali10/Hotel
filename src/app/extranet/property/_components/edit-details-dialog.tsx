@@ -4,6 +4,8 @@ import * as React from "react"
 import { Pencil } from "lucide-react"
 import { toast } from "sonner"
 
+import type { Hotel } from "@/types"
+import { useStore } from "@/store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,23 +20,47 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-const DEFAULTS = {
-  name: "Grand Horizon",
-  description:
-    "Perched on the cliffs of Malibu, Grand Horizon is a five-star coastal retreat where floor-to-ceiling glass frames the Pacific. Guests enjoy oceanfront suites, an award-winning spa, two infinity pools and a Michelin-starred restaurant — all moments from the beach.",
-  totalRooms: "142",
-  floors: "8",
-  yearBuilt: "2018",
-  lastRenovated: "2024",
-  checkIn: "15:00",
-  checkOut: "12:00",
-}
-
-export function EditDetailsDialog() {
+/**
+ * Edits the live property. The dialog used to carry its own hardcoded copy — a
+ * second description of the same hotel that disagreed with the one on the page
+ * behind it and with the one on the Descriptions screen.
+ */
+export function EditDetailsDialog({ hotel }: { hotel: Hotel }) {
   const [open, setOpen] = React.useState(false)
+  const updateHotel = useStore((s) => s.updateHotel)
+  const updatePolicies = useStore((s) => s.updatePolicies)
+
+  const [form, setForm] = React.useState({
+    name: hotel.name,
+    description: hotel.description,
+    address: hotel.address,
+    checkInTime: hotel.policies.checkInTime,
+    checkOutTime: hotel.policies.checkOutTime,
+  })
+  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
+
+  // Re-sync when the partner switches property.
+  React.useEffect(() => {
+    setForm({
+      name: hotel.name,
+      description: hotel.description,
+      address: hotel.address,
+      checkInTime: hotel.policies.checkInTime,
+      checkOutTime: hotel.policies.checkOutTime,
+    })
+  }, [hotel])
 
   function handleSave() {
-    toast.success("Property details updated")
+    updateHotel(hotel.id, {
+      name: form.name,
+      description: form.description,
+      address: form.address,
+    })
+    updatePolicies(hotel.id, {
+      checkInTime: form.checkInTime,
+      checkOutTime: form.checkOutTime,
+    })
+    toast.success("Property details updated — your listing is live with these changes.")
     setOpen(false)
   }
 
@@ -48,62 +74,47 @@ export function EditDetailsDialog() {
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Property Details</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="property-name">Property Name</Label>
-            <Input id="property-name" defaultValue={DEFAULTS.name} />
+            <Input
+              id="property-name"
+              value={form.name}
+              onChange={(e) => set({ name: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="property-description">Description</Label>
             <Textarea
               id="property-description"
-              rows={4}
-              defaultValue={DEFAULTS.description}
+              rows={5}
+              value={form.description}
+              onChange={(e) => set({ description: e.target.value })}
+            />
+            <p className="text-muted-foreground text-xs">
+              Shown under “About This Property” on your public listing.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="property-address">Address</Label>
+            <Input
+              id="property-address"
+              value={form.address}
+              onChange={(e) => set({ address: e.target.value })}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="property-total-rooms">Total Rooms</Label>
-              <Input
-                id="property-total-rooms"
-                type="number"
-                defaultValue={DEFAULTS.totalRooms}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="property-floors">Floors</Label>
-              <Input
-                id="property-floors"
-                type="number"
-                defaultValue={DEFAULTS.floors}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="property-year-built">Year Built</Label>
-              <Input
-                id="property-year-built"
-                type="number"
-                defaultValue={DEFAULTS.yearBuilt}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="property-last-renovated">Last Renovated</Label>
-              <Input
-                id="property-last-renovated"
-                type="number"
-                defaultValue={DEFAULTS.lastRenovated}
-              />
-            </div>
             <div className="space-y-1.5">
               <Label htmlFor="property-check-in">Check-in</Label>
               <Input
                 id="property-check-in"
                 type="time"
-                defaultValue={DEFAULTS.checkIn}
+                value={form.checkInTime}
+                onChange={(e) => set({ checkInTime: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
@@ -111,13 +122,18 @@ export function EditDetailsDialog() {
               <Input
                 id="property-check-out"
                 type="time"
-                defaultValue={DEFAULTS.checkOut}
+                value={form.checkOutTime}
+                onChange={(e) => set({ checkOutTime: e.target.value })}
               />
             </div>
           </div>
+          <p className="text-muted-foreground text-xs">
+            Check-in and check-out times feed your policies, the booking confirmation and
+            your public house rules.
+          </p>
         </div>
         <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
+          <DialogClose render={<Button variant="outline">Cancel</Button>} />
           <Button onClick={handleSave}>Save Changes</Button>
         </DialogFooter>
       </DialogContent>

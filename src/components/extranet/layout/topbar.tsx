@@ -139,8 +139,13 @@ export function ExtranetTopbar() {
               <DropdownMenuItem render={<Link href="/extranet/account" />}>
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem render={<Link href="/extranet/account" />}>
-                Settings
+              {/* "Settings" used to point at /extranet/account too — two menu
+                  items, one destination. */}
+              <DropdownMenuItem render={<Link href="/extranet/property/messaging" />}>
+                Notification settings
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/extranet/account/change-password" />}>
+                Security
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" render={<Link href="/" />}>
