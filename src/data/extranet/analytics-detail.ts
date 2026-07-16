@@ -45,7 +45,7 @@ export const demandCities: DemandCity[] = [
   },
   {
     id: "zermatt",
-    city: "Zermatt",
+    city: "Hong Kong",
     monthlySearches: 12300,
     yourBookings: 720,
     marketAvgRate: 380,
@@ -73,7 +73,7 @@ export const demandCities: DemandCity[] = [
   },
   {
     id: "kyoto",
-    city: "Kyoto",
+    city: "Tokyo",
     monthlySearches: 19400,
     yourBookings: 910,
     marketAvgRate: 320,
@@ -173,11 +173,11 @@ export const cancellationReasons: CancellationReason[] = [
 /* -------------------------- Comparable Properties ---------------------- */
 
 export const comparableProperties: ComparableProperty[] = [
-  { property: "Grand Horizon", yourAdr: 298, marketAdr: 310, yourOcc: 78, marketOcc: 72, yourScore: 8.6, marketScore: 8.3 },
-  { property: "The Metropolitan", yourAdr: 541, marketAdr: 520, yourOcc: 85, marketOcc: 80, yourScore: 8.9, marketScore: 8.5 },
-  { property: "Alpine Lodge Zermatt", yourAdr: 541, marketAdr: 560, yourOcc: 62, marketOcc: 65, yourScore: 8.4, marketScore: 8.6 },
-  { property: "Casa del Mar", yourAdr: 189.5, marketAdr: 175, yourOcc: 58, marketOcc: 60, yourScore: 8.2, marketScore: 8.0 },
-  { property: "Sakura Ryokan", yourAdr: 354, marketAdr: 340, yourOcc: 71, marketOcc: 68, yourScore: 9.1, marketScore: 8.7 },
+  { property: "The Ritz-Carlton", yourAdr: 298, marketAdr: 310, yourOcc: 78, marketOcc: 72, yourScore: 8.6, marketScore: 8.3 },
+  { property: "Four Seasons", yourAdr: 541, marketAdr: 520, yourOcc: 85, marketOcc: 80, yourScore: 8.9, marketScore: 8.5 },
+  { property: "The Peninsula", yourAdr: 541, marketAdr: 560, yourOcc: 62, marketOcc: 65, yourScore: 8.4, marketScore: 8.6 },
+  { property: "One&Only", yourAdr: 189.5, marketAdr: 175, yourOcc: 58, marketOcc: 60, yourScore: 8.2, marketScore: 8.0 },
+  { property: "Aman Tokyo", yourAdr: 354, marketAdr: 340, yourOcc: 71, marketOcc: 68, yourScore: 9.1, marketScore: 8.7 },
 ]
 
 /* ------------------------------ Genius Report -------------------------- */
@@ -198,19 +198,19 @@ export const geniusImpact = [
 /* ----------------------------- Ranking --------------------------------- */
 
 export const rankingRows: RankingRow[] = [
-  { rank: 3, property: "Grand Horizon", city: "Malibu, CA", score: 8.6, reviews: 1240, conversion: 8.2, trend: "up" },
-  { rank: 2, property: "The Metropolitan", city: "Chicago, IL", score: 8.9, reviews: 980, conversion: 9.1, trend: "up" },
-  { rank: 5, property: "Alpine Lodge Zermatt", city: "Zermatt", score: 8.4, reviews: 620, conversion: 6.8, trend: "down" },
-  { rank: 4, property: "Casa del Mar", city: "Tulum", score: 8.2, reviews: 410, conversion: 7.4, trend: "flat" },
-  { rank: 1, property: "Sakura Ryokan", city: "Kyoto", score: 9.1, reviews: 890, conversion: 10.2, trend: "up" },
+  { rank: 3, property: "The Ritz-Carlton", city: "New York, NY", score: 8.6, reviews: 1240, conversion: 8.2, trend: "up" },
+  { rank: 2, property: "Four Seasons", city: "Paris", score: 8.9, reviews: 980, conversion: 9.1, trend: "up" },
+  { rank: 5, property: "The Peninsula", city: "Hong Kong", score: 8.4, reviews: 620, conversion: 6.8, trend: "down" },
+  { rank: 4, property: "One&Only", city: "Maldives", score: 8.2, reviews: 410, conversion: 7.4, trend: "flat" },
+  { rank: 1, property: "Aman Tokyo", city: "Tokyo", score: 9.1, reviews: 890, conversion: 10.2, trend: "up" },
 ]
 
 /* ----------------------------- Performance ----------------------------- */
 
 export const performanceRows: PerformanceRow[] = [
-  { property: "Grand Horizon", revenue: 1284720, bookings: 4312, adr: 298, occupancy: 78, revpar: 232, score: 8.6 },
-  { property: "The Metropolitan", revenue: 1156248, bookings: 2138, adr: 541, occupancy: 85, revpar: 460, score: 8.9 },
-  { property: "Alpine Lodge Zermatt", revenue: 742180, bookings: 1284, adr: 541, occupancy: 62, revpar: 335, score: 8.4 },
-  { property: "Casa del Mar", revenue: 486920, bookings: 2570, adr: 189.5, occupancy: 58, revpar: 110, score: 8.2 },
-  { property: "Sakura Ryokan", revenue: 612332, bookings: 1730, adr: 354, occupancy: 71, revpar: 251, score: 9.1 },
+  { property: "The Ritz-Carlton", revenue: 1284720, bookings: 4312, adr: 298, occupancy: 78, revpar: 232, score: 8.6 },
+  { property: "Four Seasons", revenue: 1156248, bookings: 2138, adr: 541, occupancy: 85, revpar: 460, score: 8.9 },
+  { property: "The Peninsula", revenue: 742180, bookings: 1284, adr: 541, occupancy: 62, revpar: 335, score: 8.4 },
+  { property: "One&Only", revenue: 486920, bookings: 2570, adr: 189.5, occupancy: 58, revpar: 110, score: 8.2 },
+  { property: "Aman Tokyo", revenue: 612332, bookings: 1730, adr: 354, occupancy: 71, revpar: 251, score: 9.1 },
 ]

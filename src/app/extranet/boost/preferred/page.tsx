@@ -45,7 +45,27 @@ export default function PreferredPartnerPage() {
             toastMessage="Joined Preferred Partner programme"
           />
         </div>
-      ) : null}
+      ) : (
+        /* The partner pays the 12% platform standard; Preferred asks them to
+           accept 15%. Showing the gap beats showing nothing. */
+        <div className="flex items-center gap-3 rounded-xl bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300">
+          <CheckCircle2 className="size-5 shrink-0" />
+          <div>
+            <p className="font-medium">
+              {preferredCriteria.filter((c) => c.met).length} of {preferredCriteria.length}{" "}
+              requirements met
+            </p>
+            <p className="text-sm opacity-90">
+              Still to do:{" "}
+              {preferredCriteria
+                .filter((c) => !c.met)
+                .map((c) => `${c.label} (${c.required})`)
+                .join(", ")}
+              .
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {preferredCriteria.map((c) => (

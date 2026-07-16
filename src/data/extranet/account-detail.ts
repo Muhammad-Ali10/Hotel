@@ -1,57 +1,4 @@
-import type {
-  Compliance,
-  Contact,
-  Contract,
-  Device,
-} from "@/lib/extranet/types"
-
-export const contacts: Contact[] = [
-  {
-    id: "ct1",
-    name: "Sarah Mitchell",
-    email: "sarah.mitchell@aurorahospitality.com",
-    phone: "+1 (310) 555-0101",
-    role: "General Manager",
-    property: "All Properties",
-    seed: "sarah-mitchell",
-  },
-  {
-    id: "ct2",
-    name: "David Chen",
-    email: "david.chen@aurorahospitality.com",
-    phone: "+1 (312) 555-0144",
-    role: "Operations Manager",
-    property: "The Metropolitan",
-    seed: "david-chen",
-  },
-  {
-    id: "ct3",
-    name: "Maria Lopez",
-    email: "maria.lopez@aurorahospitality.com",
-    phone: "+52 984 555 0177",
-    role: "Property Manager",
-    property: "Casa del Mar",
-    seed: "maria-lopez",
-  },
-  {
-    id: "ct4",
-    name: "Hiroshi Tanaka",
-    email: "hiroshi.tanaka@aurorahospitality.com",
-    phone: "+81 75 555 0188",
-    role: "Property Manager",
-    property: "Sakura Ryokan",
-    seed: "hiroshi-tanaka",
-  },
-  {
-    id: "ct5",
-    name: "Hans Mueller",
-    email: "hans.mueller@aurorahospitality.com",
-    phone: "+41 27 555 0199",
-    role: "Property Manager",
-    property: "Alpine Lodge Zermatt",
-    seed: "hans-mueller",
-  },
-]
+import type { Compliance, Contract, Device } from "@/lib/extranet/types"
 
 export const devices: Device[] = [
   {
@@ -76,7 +23,7 @@ export const devices: Device[] = [
     id: "dv3",
     name: "iPad Air",
     browser: "Safari 18",
-    location: "Malibu, US",
+    location: "Paris, FR",
     lastActive: "Yesterday",
     current: false,
     type: "tablet",
@@ -85,7 +32,7 @@ export const devices: Device[] = [
     id: "dv4",
     name: "Windows Desktop",
     browser: "Edge 126",
-    location: "Zurich, CH",
+    location: "Hong Kong, HK",
     lastActive: "3 days ago",
     current: false,
     type: "desktop",

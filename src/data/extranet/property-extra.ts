@@ -19,16 +19,6 @@ const rawCategories: Omit<ScoreCategory, "status">[] = [
   { id: "sc7", name: "Rate Competitiveness", score: 72, tip: "Your rates are 12% above market average. Consider adjusting." },
 ]
 
-export const propertyScore = {
-  overall: 85,
-  note: "Properties with scores above 85 get 34% more bookings on average.",
-  categories: rawCategories.map(
-    (c): ScoreCategory => ({ ...c, status: scoreStatus(c.score) })
-  ),
-}
-
-/* ------------------------ Facilities & Services ------------------------ */
-
 export const facilityGroups: AmenityGroup[] = [
   {
     category: "General",
@@ -110,16 +100,3 @@ export const facilityGroups: AmenityGroup[] = [
 ]
 
 /* --------------------------- Reservation Policies ---------------------- */
-
-export const reservationPolicies: ReservationPolicy[] = [
-  { id: "rp1", title: "Check-in Time", value: "From 3:00 PM", detail: "Early check-in on request", icon: "Clock" },
-  { id: "rp2", title: "Check-out Time", value: "Until 11:00 AM", detail: "Late check-out subject to availability", icon: "Clock" },
-  { id: "rp3", title: "Cancellation Policy", value: "Free up to 24h before", detail: "Non-refundable rates excluded", icon: "CalendarClock" },
-  { id: "rp4", title: "No-show Policy", value: "First night charged", detail: "Remaining nights released", icon: "AlertTriangle" },
-  { id: "rp5", title: "Prepayment", value: "Depends on rate plan", detail: "Some rates require full prepayment", icon: "CreditCard" },
-  { id: "rp6", title: "Children & Beds", value: "All ages welcome", detail: "Cribs free, extra beds $40/night", icon: "Users" },
-  { id: "rp7", title: "Pets", value: "Allowed with fee", detail: "$35 per night, max 2 pets", icon: "BadgeCheck" },
-  { id: "rp8", title: "Age Restriction", value: "18+ to check in", detail: "Valid photo ID required", icon: "ShieldCheck" },
-  { id: "rp9", title: "Payment Methods", value: "All major cards accepted", detail: "Visa, Mastercard, Amex", icon: "CreditCard" },
-  { id: "rp10", title: "Smoking", value: "Non-smoking property", detail: "Designated outdoor areas", icon: "AlertTriangle" },
-]

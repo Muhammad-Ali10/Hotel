@@ -1,63 +1,8 @@
-import type { TeamUser, ToggleSetting } from "@/lib/extranet/types"
+import type { ToggleSetting } from "@/lib/extranet/types"
 
-export const currentUser = {
-  name: "Sarah Mitchell",
-  role: "General Manager",
-  email: "sarah.mitchell@aurorahospitality.com",
-  phone: "+1 (310) 555-0101",
-  company: "Aurora Hospitality",
-  location: "Malibu, CA",
-  seed: "sarah-mitchell",
-}
-
-/** Create & Manage Users — 5 team members. */
-export const teamUsers: TeamUser[] = [
-  {
-    id: "u1",
-    name: "Sarah Mitchell",
-    email: "sarah.mitchell@aurorahospitality.com",
-    role: "Admin",
-    status: "Active",
-    lastLogin: "2 hours ago",
-    seed: "sarah-mitchell",
-  },
-  {
-    id: "u2",
-    name: "David Chen",
-    email: "david.chen@aurorahospitality.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "Yesterday",
-    seed: "david-chen",
-  },
-  {
-    id: "u3",
-    name: "Maria Lopez",
-    email: "maria.lopez@aurorahospitality.com",
-    role: "Manager",
-    status: "Active",
-    lastLogin: "3 days ago",
-    seed: "maria-lopez",
-  },
-  {
-    id: "u4",
-    name: "Hans Mueller",
-    email: "hans.mueller@aurorahospitality.com",
-    role: "Staff",
-    status: "Active",
-    lastLogin: "1 week ago",
-    seed: "hans-mueller",
-  },
-  {
-    id: "u5",
-    name: "Tom Bergman",
-    email: "tom.bergman@aurorahospitality.com",
-    role: "Staff",
-    status: "Invited",
-    lastLogin: "Never",
-    seed: "tom-bergman",
-  },
-]
+/** Extranet preference toggles. People live in ./team — the team list and the
+ *  contacts list used to be two separate arrays that disagreed on who worked
+ *  here. */
 
 export const notificationSettings: ToggleSetting[] = [
   {

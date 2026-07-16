@@ -13,18 +13,17 @@ export const financeStats: Stat[] = [
     trend: "up",
   },
   {
-    label: "Avg. Commission Rate",
-    value: "12.4%",
-    delta: "+0.2pp",
-    trend: "up",
+    label: "Commission Rate",
+    value: "12%",
+    caption: "Platform standard",
   },
 ]
 
 /** Revenue by property (YTD). Revenue column sums to $4,282,400. */
 export const revenueByProperty: RevenueRow[] = [
   {
-    property: "Grand Horizon",
-    city: "Malibu, CA",
+    property: "The Ritz-Carlton",
+    city: "New York, NY",
     revenue: 1284720,
     bookings: 4312,
     adr: 298,
@@ -33,8 +32,8 @@ export const revenueByProperty: RevenueRow[] = [
     growth: 18,
   },
   {
-    property: "The Metropolitan",
-    city: "Chicago, IL",
+    property: "Four Seasons",
+    city: "Paris",
     revenue: 1156248,
     bookings: 2138,
     adr: 541,
@@ -43,8 +42,8 @@ export const revenueByProperty: RevenueRow[] = [
     growth: 14,
   },
   {
-    property: "Alpine Lodge Zermatt",
-    city: "Zermatt",
+    property: "The Peninsula",
+    city: "Hong Kong",
     revenue: 742180,
     bookings: 1284,
     adr: 541,
@@ -53,8 +52,8 @@ export const revenueByProperty: RevenueRow[] = [
     growth: 9,
   },
   {
-    property: "Casa del Mar",
-    city: "Tulum",
+    property: "One&Only",
+    city: "Maldives",
     revenue: 486920,
     bookings: 2570,
     adr: 189.5,
@@ -63,8 +62,8 @@ export const revenueByProperty: RevenueRow[] = [
     growth: 24,
   },
   {
-    property: "Sakura Ryokan",
-    city: "Kyoto",
+    property: "Aman Tokyo",
+    city: "Tokyo",
     revenue: 612332,
     bookings: 1730,
     adr: 354,

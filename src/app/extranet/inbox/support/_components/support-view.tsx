@@ -1,23 +1,47 @@
 "use client"
 
 import * as React from "react"
-import { Send } from "lucide-react"
+import { Inbox, Send } from "lucide-react"
 import { toast } from "sonner"
 
-import { supportThreads, supportTickets } from "@/data/extranet"
 import { cn } from "@/lib/utils"
-import { StatusPill } from "@/components/extranet/shared"
+import { formatRelativeTime } from "@/lib/format"
+import { ticketPriorityLabel } from "@/lib/labels"
+import { useStore } from "@/store"
+import { useTickets } from "@/store/selectors"
+import { partnerProfile } from "@/data/profile"
+import { TicketStatusBadge } from "@/components/shared/status-badge"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 
+/**
+ * The partner's tickets — the same list the Generate Ticket dialog writes to.
+ * This view used to render a fixed array, so a ticket the partner had just
+ * created never appeared.
+ */
 export function SupportView() {
-  const [activeId, setActiveId] = React.useState(supportTickets[0].id)
+  const tickets = useTickets("partner")
+  const replyToTicket = useStore((s) => s.replyToTicket)
+  const setTicketStatus = useStore((s) => s.setTicketStatus)
+
+  const [activeId, setActiveId] = React.useState<string | null>(null)
   const [reply, setReply] = React.useState("")
 
-  const active =
-    supportTickets.find((t) => t.id === activeId) ?? supportTickets[0]
-  const thread = supportThreads[active.id] ?? []
+  const active = tickets.find((t) => t.id === activeId) ?? tickets[0]
+
+  if (tickets.length === 0 || !active) {
+    return (
+      <Card className="flex flex-col items-center gap-2 py-16 text-center">
+        <Inbox className="text-muted-foreground size-7" />
+        <p className="font-medium">No tickets yet</p>
+        <p className="text-muted-foreground text-sm">
+          Use Generate Ticket to raise one with Stayora support.
+        </p>
+      </Card>
+    )
+  }
 
   return (
     <Card className="overflow-hidden p-0">
@@ -26,33 +50,32 @@ export function SupportView() {
         <div className="flex flex-col border-b lg:border-r lg:border-b-0">
           <div className="flex items-center justify-between gap-2 border-b p-3">
             <span className="text-sm font-medium">All Tickets</span>
-            <span className="text-muted-foreground text-xs">
-              {supportTickets.length} total
-            </span>
+            <span className="text-muted-foreground text-xs">{tickets.length} total</span>
           </div>
           <ul className="max-h-[320px] flex-1 divide-y overflow-y-auto lg:max-h-none">
-            {supportTickets.map((t) => {
-              const activeRow = t.id === activeId
+            {tickets.map((t) => {
+              const activeRow = t.id === active.id
               return (
                 <li key={t.id}>
                   <button
                     type="button"
                     onClick={() => setActiveId(t.id)}
                     className={cn(
-                      "w-full space-y-1.5 p-3 text-left transition-colors",
-                      activeRow ? "bg-muted" : "hover:bg-muted/50"
+                      "hover:bg-accent/40 w-full space-y-1 p-3 text-left transition-colors",
+                      activeRow && "bg-muted/60"
                     )}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground text-xs font-medium">
-                        {t.id}
-                      </span>
-                      <StatusPill status={t.status} />
+                      <span className="text-muted-foreground font-mono text-xs">{t.id}</span>
+                      <TicketStatusBadge status={t.status} />
                     </div>
-                    <p className="text-sm font-medium">{t.subject}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {t.guest} · {t.category} · {t.priority} priority
-                    </p>
+                    <p className="truncate text-sm font-medium">{t.subject}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">{t.category}</Badge>
+                      <span className="text-muted-foreground text-xs">
+                        {formatRelativeTime(t.updatedAt)}
+                      </span>
+                    </div>
                   </button>
                 </li>
               )
@@ -61,72 +84,69 @@ export function SupportView() {
         </div>
 
         {/* Thread */}
-        <div className="flex min-h-[360px] flex-col lg:min-h-0">
-          <div className="flex items-center justify-between gap-2 border-b p-4">
+        <div className="flex min-w-0 flex-col">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{active.subject}</p>
-              <p className="text-muted-foreground truncate text-xs">
-                {active.id} · {active.guest}
+              <p className="truncate text-sm font-medium">{active.subject}</p>
+              <p className="text-muted-foreground text-xs">
+                {active.id} · {active.category} · {ticketPriorityLabel[active.priority]} priority
               </p>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <StatusPill status={active.status} />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => toast.success(`Viewing ticket ${active.id}`)}
-              >
-                Ticket
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = active.status === "resolved" ? "open" : "resolved"
+                setTicketStatus(active.id, next)
+                toast.success(
+                  next === "resolved" ? `${active.id} resolved.` : `${active.id} reopened.`
+                )
+              }}
+            >
+              {active.status === "resolved" ? "Reopen" : "Mark resolved"}
+            </Button>
           </div>
-          <div className="bg-muted/20 flex-1 space-y-3 overflow-y-auto p-4">
-            {thread.map((m) => (
-              <div
+
+          <ul className="flex-1 space-y-4 overflow-y-auto p-4">
+            {active.messages.map((m) => (
+              <li
                 key={m.id}
-                className={cn(
-                  "flex",
-                  m.from === "host" ? "justify-end" : "justify-start"
-                )}
+                className={cn("flex", m.from === "user" ? "justify-end" : "justify-start")}
               >
                 <div
                   className={cn(
-                    "max-w-[78%] rounded-2xl px-3 py-2 text-sm",
-                    m.from === "host"
-                      ? "bg-primary text-primary-foreground rounded-br-sm"
-                      : "bg-card rounded-bl-sm ring-1 ring-foreground/10"
+                    "max-w-[80%] space-y-1 rounded-lg px-3 py-2",
+                    m.from === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
                   )}
                 >
-                  <p>{m.text}</p>
-                  <p
-                    className={cn(
-                      "mt-1 text-[10px]",
-                      m.from === "host"
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {m.time}
+                  <p className="text-sm text-pretty">{m.text}</p>
+                  <p className="text-xs opacity-70">
+                    {m.author} · {formatRelativeTime(m.date)}
                   </p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
+
           <div className="flex items-end gap-2 border-t p-3">
             <Textarea
               value={reply}
               onChange={(e) => setReply(e.target.value)}
-              placeholder="Type your reply…"
-              className="max-h-32 min-h-10"
+              placeholder="Reply to support…"
+              className="min-h-10 flex-1"
               rows={1}
             />
             <Button
               size="icon"
-              aria-label="Send"
-              disabled={!reply.trim()}
+              aria-label="Send reply"
               onClick={() => {
-                toast.success("Reply sent")
+                if (!reply.trim()) {
+                  toast.error("Write a reply first.")
+                  return
+                }
+                replyToTicket(active.id, reply.trim(), partnerProfile.name)
                 setReply("")
+                toast.success("Reply sent.")
               }}
             >
               <Send className="size-4" />

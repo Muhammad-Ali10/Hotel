@@ -107,13 +107,6 @@ export const weeklyOccupancy: SeriesPoint[] = [
   { label: "Sun", value: 76 },
 ]
 
-export const upcomingCheckIns: CheckIn[] = [
-  { guest: "Mateo Silva", roomNo: "312", room: "Deluxe Ocean Suite", inDays: 1 },
-  { guest: "Isabella Rossi", roomNo: "201", room: "Premium King", inDays: 2 },
-  { guest: "Ethan Park", roomNo: "115", room: "Standard Room", inDays: 3 },
-  { guest: "Charlotte Dubois", roomNo: "405", room: "Family Suite", inDays: 4 },
-]
-
 export const pendingActions: PendingAction[] = [
   {
     id: "pa1",

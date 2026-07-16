@@ -25,11 +25,11 @@ import {
 } from "@/components/ui/select"
 
 const PROPERTIES = [
-  "Grand Horizon",
-  "The Metropolitan",
-  "Alpine Lodge Zermatt",
-  "Casa del Mar",
-  "Sakura Ryokan",
+  "The Ritz-Carlton",
+  "Four Seasons",
+  "The Peninsula",
+  "One&Only",
+  "Aman Tokyo",
 ]
 
 const ROOM_TYPES = [

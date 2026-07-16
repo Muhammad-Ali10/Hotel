@@ -1,86 +1,62 @@
 import type { Property } from "@/lib/extranet/types"
+import { PARTNER_ORG } from "@/data/config"
+import { partnerHotels } from "@/data/hotels"
+import { partnerBookings } from "@/data/bookings"
+import { reviews as allReviews } from "@/data/reviews"
+import { datesInRange, deriveRating, toISODate } from "@/lib/domain"
+import { TODAY } from "@/data/config"
 
 /**
- * The partner's portfolio — "Aurora Hospitality", 5 properties.
- * Room counts sum to 604; today's revenue sums to $21,872 (matches the
- * Properties + Dashboard KPI tiles).
+ * The partner's portfolio — derived from the real catalogue.
+ *
+ * Aurora used to manage five properties that existed nowhere on the public
+ * site, so nothing a partner did could reach a guest. They now manage five of
+ * the ten listed hotels, and the figures below are counted from the same
+ * bookings and reviews every other surface reads.
  */
-export const properties: Property[] = [
-  {
-    id: "grand-horizon",
-    name: "Grand Horizon",
-    city: "Malibu, CA",
-    country: "United States",
-    rooms: 142,
-    occupancy: 78,
-    adr: 298,
-    revenueToday: 4862,
-    rating: 5,
+export const properties: Property[] = partnerHotels.map((hotel) => {
+  const bookings = partnerBookings.filter(
+    (b) => b.hotelId === hotel.id && b.status !== "cancelled"
+  )
+  const staying = bookings.filter((b) => datesInRange(b.checkIn, b.checkOut).includes(TODAY))
+  const rooms = hotel.rooms.reduce((sum, r) => sum + r.units, 0)
+  const revenueToday = staying.reduce(
+    (sum, b) => sum + Math.round(b.pricing.total / Math.max(b.pricing.nights, 1)),
+    0
+  )
+  const adr = staying.length ? Math.round(revenueToday / staying.length) : hotel.pricePerNight
+
+  return {
+    id: hotel.id,
+    name: hotel.name,
+    city: hotel.city,
+    country: hotel.country,
+    rooms,
+    occupancy: Math.round((staying.length / Math.max(rooms, 1)) * 100),
+    adr,
+    revenueToday,
+    rating: deriveRating(allReviews.filter((r) => r.hotelId === hotel.id && r.status === "published"))
+      .rating,
     status: "Active",
-    seed: "grand-horizon",
-  },
-  {
-    id: "the-metropolitan",
-    name: "The Metropolitan",
-    city: "Chicago, IL",
-    country: "United States",
-    rooms: 215,
-    occupancy: 85,
-    adr: 541,
-    revenueToday: 3850,
-    rating: 5,
-    status: "Active",
-    seed: "the-metropolitan",
-  },
-  {
-    id: "alpine-lodge",
-    name: "Alpine Lodge Zermatt",
-    city: "Zermatt",
-    country: "Switzerland",
-    rooms: 89,
-    occupancy: 62,
-    adr: 541,
-    revenueToday: 6720,
-    rating: 5,
-    status: "Active",
-    seed: "alpine-lodge-zermatt",
-  },
-  {
-    id: "casa-del-mar",
-    name: "Casa del Mar",
-    city: "Tulum",
-    country: "Mexico",
-    rooms: 64,
-    occupancy: 58,
-    adr: 189.5,
-    revenueToday: 1690,
-    rating: 5,
-    status: "Active",
-    seed: "casa-del-mar",
-  },
-  {
-    id: "sakura-ryokan",
-    name: "Sakura Ryokan",
-    city: "Kyoto",
-    country: "Japan",
-    rooms: 94,
-    occupancy: 71,
-    adr: 354,
-    revenueToday: 4750,
-    rating: 5,
-    status: "Active",
-    seed: "sakura-ryokan",
-  },
-]
+    seed: hotel.seed,
+  }
+})
 
 /** The property currently in focus in the top-bar switcher. */
-export const activeProperty = properties[0]
+export const activeProperty =
+  properties.find((p) => p.id === PARTNER_ORG.activeHotelId) ?? properties[0]
 
 export const portfolioStats = {
   totalProperties: properties.length,
   totalRooms: properties.reduce((sum, p) => sum + p.rooms, 0),
-  todaysBookings: 52,
+  todaysBookings: partnerBookings.filter((b) =>
+    datesInRange(b.checkIn, b.checkOut).includes(TODAY)
+  ).length,
   todaysRevenue: properties.reduce((sum, p) => sum + p.revenueToday, 0),
-  occupancy: 78,
-  adr: 412.5,
+  occupancy: Math.round(
+    properties.reduce((sum, p) => sum + p.occupancy, 0) / Math.max(properties.length, 1)
+  ),
+  adr: Math.round(
+    properties.reduce((sum, p) => sum + p.adr, 0) / Math.max(properties.length, 1)
+  ),
 }

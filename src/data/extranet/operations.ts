@@ -77,83 +77,13 @@ export const ratePlans: RatePlan[] = [
 ]
 
 /** Active Promotions — 6 promotions, 5 active. */
-export const promotions: Promotion[] = [
-  {
-    id: "PROMO-001",
-    name: "Early Bird 2026",
-    discount: "20% off",
-    period: "Jan 1 – Mar 31, 2026",
-    roomTypes: "All rooms",
-    bookings: 312,
-    revenue: 52840,
-    status: "Active",
-  },
-  {
-    id: "PROMO-002",
-    name: "Summer Getaway",
-    discount: "$50 off",
-    period: "Jun 1 – Aug 31, 2026",
-    roomTypes: "Suites",
-    bookings: 198,
-    revenue: 41260,
-    status: "Active",
-  },
-  {
-    id: "PROMO-003",
-    name: "Last Minute Escape",
-    discount: "35% off",
-    period: "Rolling · within 3 days",
-    roomTypes: "Standard, Premium",
-    bookings: 145,
-    revenue: 18540,
-    status: "Active",
-  },
-  {
-    id: "PROMO-004",
-    name: "Weekend Special",
-    discount: "3rd night free",
-    period: "Fri – Sun",
-    roomTypes: "All rooms",
-    bookings: 0,
-    revenue: 0,
-    status: "Paused",
-  },
-  {
-    id: "PROMO-005",
-    name: "Loyalty Member Rate",
-    discount: "10% off",
-    period: "Year-round",
-    roomTypes: "All rooms",
-    bookings: 523,
-    revenue: 88910,
-    status: "Active",
-  },
-  {
-    id: "PROMO-006",
-    name: "Stay Longer, Save More",
-    discount: "15% off",
-    period: "Stays of 5+ nights",
-    roomTypes: "All rooms",
-    bookings: 147,
-    revenue: 37443,
-    status: "Active",
-  },
-]
-
-export const promotionStats = {
-  totalRevenue: promotions.reduce((sum, p) => sum + p.revenue, 0),
-  totalBookings: promotions.reduce((sum, p) => sum + p.bookings, 0),
-  avgDiscount: "18.5%",
-  active: promotions.filter((p) => p.status === "Active").length,
-}
-
 /** Opportunity Center — 4 opportunities to boost performance. */
 export const opportunities: Opportunity[] = [
   {
     id: "op1",
     title: "Add photos of your restaurant",
     description:
-      "Properties with dining photos get 18% more bookings. Grand Horizon has no restaurant images yet.",
+      "Properties with dining photos get 18% more bookings. The Ritz-Carlton has no restaurant images yet.",
     impact: "High",
     cta: "Add photos",
     icon: "Camera",

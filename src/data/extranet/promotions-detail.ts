@@ -114,7 +114,7 @@ export const preferredCriteria: PreferredCriterion[] = [
   { id: "pc1", label: "Review Score", required: "8.0+", yours: "8.4", met: true },
   { id: "pc2", label: "Response Rate", required: "90%+", yours: "95%", met: true },
   { id: "pc3", label: "Cancellation Rate", required: "<5%", yours: "2.3%", met: true },
-  { id: "pc4", label: "Commission", required: "15% min", yours: "15%", met: true },
+  { id: "pc4", label: "Commission", required: "15% min", yours: "12%", met: false },
   { id: "pc5", label: "Available Rooms", required: "5+", yours: "34", met: true },
   { id: "pc6", label: "Photos", required: "20+", yours: "28", met: true },
 ]
