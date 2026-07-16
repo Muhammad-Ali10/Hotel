@@ -9,6 +9,9 @@
       "Bash(cat)",
       "Bash(git add *)",
       "Bash(git commit *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\Muhammad Ali\\.claude\\projects\\E--Hotel\\memory"
     ]
   }
 }
