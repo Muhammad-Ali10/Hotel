@@ -17,6 +17,19 @@ import { promotions } from "@/data/promotions"
 import { notifications } from "@/data/notifications"
 import { tickets } from "@/data/tickets"
 import { userProfile, userSettings } from "@/data/profile"
+import { currentUser, teamUsers } from "@/data/extranet/team"
+import { notificationSettings, securitySettings } from "@/data/extranet/account"
+import type { TeamUser, ToggleSetting } from "@/lib/extranet/types"
+
+export type PartnerProfile = {
+  name: string
+  role: string
+  email: string
+  phone: string
+  company: string
+  location: string
+  seed: string
+}
 
 export type AppState = {
   hotels: Hotel[]
@@ -28,6 +41,10 @@ export type AppState = {
   favorites: string[]
   profile: UserProfile
   settings: UserSettings
+  /** The signed-in partner user and their team — editable in the extranet. */
+  partner: PartnerProfile
+  team: TeamUser[]
+  partnerSettings: ToggleSetting[]
 }
 
 /**
@@ -59,5 +76,8 @@ export function buildSeed(): AppState {
     favorites: ["burj-al-arab", "aman-tokyo", "one-and-only", "six-senses"],
     profile: userProfile,
     settings: userSettings,
+    partner: currentUser,
+    team: teamUsers,
+    partnerSettings: [...notificationSettings, ...securitySettings],
   }
 }

@@ -32,50 +32,6 @@ export type Property = {
   seed: string
 }
 
-export type ReservationStatus =
-  | "Confirmed"
-  | "Checked In"
-  | "Checked Out"
-  | "Cancelled"
-  | "Pending"
-
-export type Reservation = {
-  id: string
-  guest: string
-  email: string
-  room: string
-  roomNo: string
-  checkIn: string
-  checkOut: string
-  guests: number
-  source: string
-  status: ReservationStatus
-  total: number
-  property: string
-  createdAt: string
-  notes: string
-}
-
-export type Cancellation = {
-  id: string
-  guest: string
-  room: string
-  originalDates: string
-  cancelledOn: string
-  reason: string
-  by: "Guest" | "Hotel"
-  total: number
-  refund: number
-  refundStatus: "Full Refund" | "Partial" | "No Refund" | "Pending" | "Processed"
-}
-
-export type CheckIn = {
-  guest: string
-  roomNo: string
-  room: string
-  inDays: number
-}
-
 export type PendingAction = {
   id: string
   title: string
@@ -100,17 +56,6 @@ export type RatePlan = {
   status: "Active" | "Draft"
 }
 
-export type Promotion = {
-  id: string
-  name: string
-  discount: string
-  period: string
-  roomTypes: string
-  bookings: number
-  revenue: number
-  status: "Active" | "Paused" | "Draft"
-}
-
 export type Opportunity = {
   id: string
   title: string
@@ -118,23 +63,6 @@ export type Opportunity = {
   impact: "High" | "Medium" | "Low"
   cta: string
   icon: string
-}
-
-export type ReviewStatus = "Approved" | "Pending" | "Flagged" | "Rejected"
-
-export type Review = {
-  id: string
-  guest: string
-  rating: number
-  daysAgo: number
-  status: ReviewStatus
-  property: string
-  room: string
-  bookingId: string
-  title: string
-  body: string
-  response?: string
-  seed: string
 }
 
 export type Conversation = {
@@ -198,37 +126,8 @@ export type ToggleSetting = {
   enabled: boolean
 }
 
-export type RoomType = {
-  id: string
-  name: string
-  price: number
-  description: string
-  bed: string
-  guests: number
-  size: number
-  units: number
-  booked: number
-  available: number
-  amenities: string[]
-  seed: string
-}
-
 export type AmenityItem = { name: string; enabled: boolean }
 export type AmenityGroup = { category: string; icon: string; items: AmenityItem[] }
-
-export type Photo = {
-  id: string
-  category: "Exterior" | "Interior" | "Rooms" | "Amenities" | "Dining"
-  caption: string
-  seed: string
-}
-
-export type Policy = {
-  id: string
-  title: string
-  body: string
-  icon: string
-}
 
 export type Transaction = {
   id: string
@@ -329,15 +228,6 @@ export type MobileRate = {
   roomTypes: string
   platform: string
   minStay: string
-}
-
-export type ValueAdd = {
-  id: string
-  name: string
-  category: string
-  description: string
-  price: string
-  status: "Active" | "Inactive"
 }
 
 export type SourceMarket = { country: string; share: number }
@@ -502,18 +392,6 @@ export type RoomDifferentiation = {
   advantage: string
 }
 
-export type SupportTicket = {
-  id: string
-  subject: string
-  guest: string
-  category: string
-  priority: "Low" | "Medium" | "High"
-  status: "Open" | "Resolved"
-  updated: string
-  preview: string
-  seed: string
-}
-
 export type GuestComm = {
   id: string
   guest: string
@@ -525,22 +403,6 @@ export type GuestComm = {
   time: string
   messages: number
   seed: string
-}
-
-export type ScoreCategory = {
-  id: string
-  name: string
-  score: number
-  status: string
-  tip: string
-}
-
-export type ReservationPolicy = {
-  id: string
-  title: string
-  value: string
-  detail: string
-  icon: string
 }
 
 /** Delivery channels for a notification preference. */

@@ -1,10 +1,9 @@
-import { Download } from "lucide-react"
-
-import { dashboardDate, dashboardStats } from "@/data/extranet"
-import { ActionButton, PageHeader, StatGrid } from "@/components/extranet/shared"
 import { PropertyStrip } from "./_components/property-strip"
 import { OverviewCharts } from "./_components/overview-charts"
-import { NewReservationDialog } from "./_components/new-reservation-dialog"
+import {
+  ExtranetDashboardHeader,
+  ExtranetDashboardStats,
+} from "./_components/dashboard-header"
 import {
   PendingActions,
   RecentReservations,
@@ -15,23 +14,9 @@ import {
 export default function ExtranetDashboardPage() {
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Dashboard"
-        subtitle={`Aggregated overview across all properties · ${dashboardDate}`}
-      >
-        <ActionButton
-          variant="outline"
-          size="sm"
-          toastType="info"
-          toastMessage="Exporting dashboard summary…"
-        >
-          <Download className="size-4" />
-          Export
-        </ActionButton>
-        <NewReservationDialog />
-      </PageHeader>
+      <ExtranetDashboardHeader />
 
-      <StatGrid stats={dashboardStats} />
+      <ExtranetDashboardStats />
 
       <PropertyStrip />
 

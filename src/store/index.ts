@@ -29,11 +29,14 @@ import type {
 import {
   makeBookingRef,
   makeTicketRef,
+  nightsBetween,
   priceBooking,
   refundFor,
   toISODate,
+  valueAddPrice,
 } from "@/lib/domain"
-import { applyPromotions, buildSeed, type AppState } from "./seed"
+import { applyPromotions, buildSeed, type AppState, type PartnerProfile } from "./seed"
+import type { TeamUser } from "@/lib/extranet/types"
 
 /** Runtime "now" — actions use the real clock; only the seed is date-pinned. */
 const now = () => new Date()
@@ -108,6 +111,12 @@ type Actions = {
   updateProfile: (changes: Partial<UserProfile>) => void
   updateSettings: (changes: Partial<UserSettings>) => void
 
+  /* partner account */
+  updatePartner: (changes: Partial<PartnerProfile>) => void
+  setPartnerSetting: (id: string, enabled: boolean) => void
+  addTeamUser: (user: TeamUser) => void
+  removeTeamUser: (id: string) => void
+
   /* hotel content — partner edits that surface publicly */
   updateHotel: (
     id: string,
@@ -141,6 +150,26 @@ export type Store = AppState & Actions
 /** Recomputes every hotel's public discount after a promotion changes. */
 function withPromotions(state: AppState): Pick<AppState, "hotels"> {
   return { hotels: applyPromotions(state.hotels, state.promotions, today()) }
+}
+
+/**
+ * Re-resolves stored add-ons against a stay. `valueAddPrice` folds the unit
+ * ("per person", "per night") into the amount, so the stored price is only
+ * correct for the stay it was quoted against — a modified booking has to ask
+ * the catalogue again. Add-ons the property has since removed are dropped.
+ */
+function repriceAddOns(
+  addOns: BookingAddOn[],
+  hotel: Hotel,
+  stay: { nights: number; guests: number }
+): BookingAddOn[] {
+  return addOns
+    .map((a) => {
+      const valueAdd = hotel.valueAdds.find((v) => v.id === a.id)
+      if (!valueAdd) return null
+      return { id: a.id, name: valueAdd.name, price: valueAddPrice(valueAdd, stay), qty: 1 }
+    })
+    .filter((a) => a !== null)
 }
 
 function pushNotification(
@@ -267,12 +296,23 @@ export const useStore = create<Store>()(
             const hotel = state.hotels.find((h) => h.id === b.hotelId)
             const room = hotel?.rooms.find((r) => r.id === b.roomId)
             if (!hotel || !room) return b
+
+            const nights = nightsBetween(changes.checkIn, changes.checkOut)
+            // Add-ons are re-resolved against the NEW nights and party size.
+            // Carrying the stored prices through left a per-person breakfast at
+            // its two-guest price after the booking grew to four.
+            const addOns = repriceAddOns(b.addOns, hotel, {
+              nights,
+              guests: changes.guests,
+            })
+
             return {
               ...b,
               checkIn: changes.checkIn,
               checkOut: changes.checkOut,
               guests: changes.guests,
               specialRequests: changes.specialRequests ?? b.specialRequests,
+              addOns,
               // re-priced against the same rules the guest booked under
               pricing: priceBooking({
                 hotel,
@@ -280,7 +320,7 @@ export const useStore = create<Store>()(
                 checkIn: changes.checkIn,
                 checkOut: changes.checkOut,
                 guests: changes.guests,
-                addOns: b.addOns,
+                addOns,
               }),
             }
           }),
@@ -352,6 +392,10 @@ export const useStore = create<Store>()(
         }))
         const review = get().reviews.find((r) => r.id === id)
         if (!review) return
+        // Only the review's own author hears about the reply. Notifying
+        // unconditionally told the signed-in customer that a hotel had answered
+        // a review written by somebody else.
+        if (review.authorSeed !== get().profile.avatarSeed) return
         set((state) => ({
           notifications: pushNotification(state, {
             audience: "customer",
@@ -464,6 +508,23 @@ export const useStore = create<Store>()(
 
       updateSettings: (changes) =>
         set((state) => ({ settings: { ...state.settings, ...changes } })),
+
+      /* ------------------------------------------------- partner account -- */
+
+      updatePartner: (changes) =>
+        set((state) => ({ partner: { ...state.partner, ...changes } })),
+
+      setPartnerSetting: (id, enabled) =>
+        set((state) => ({
+          partnerSettings: state.partnerSettings.map((s) =>
+            s.id === id ? { ...s, enabled } : s
+          ),
+        })),
+
+      addTeamUser: (user) => set((state) => ({ team: [...state.team, user] })),
+
+      removeTeamUser: (id) =>
+        set((state) => ({ team: state.team.filter((u) => u.id !== id) })),
 
       /* --------------------------------------------------------- hotels -- */
 
@@ -610,6 +671,9 @@ export const useStore = create<Store>()(
         favorites: state.favorites,
         profile: state.profile,
         settings: state.settings,
+        partner: state.partner,
+        team: state.team,
+        partnerSettings: state.partnerSettings,
       }),
     }
   )

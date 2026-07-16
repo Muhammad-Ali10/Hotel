@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 
 import type { Booking, NotificationAudience, Review } from "@/types"
-import { deriveRating, isUpcoming, toISODate } from "@/lib/domain"
+import { datesInRange, deriveRating, isUpcoming, toISODate } from "@/lib/domain"
 import { PARTNER_ORG } from "@/data/config"
 import { useStore } from "./index"
 
@@ -242,6 +242,67 @@ export function useDashboardStats() {
 }
 
 /* ------------------------------------------------------------- extranet -- */
+
+/**
+ * The partner's portfolio, counted live. The Properties screen and the extranet
+ * dashboard read this instead of a module-level snapshot, so a guest review, a
+ * rename, or a room edit moves these numbers too.
+ */
+export function usePartnerPortfolio() {
+  const hotels = usePartnerHotels()
+  const bookings = useStore((s) => s.bookings)
+  const reviews = useStore((s) => s.reviews)
+
+  return useMemo(() => {
+    const today = toISODate(new Date())
+
+    const rows = hotels.map((hotel) => {
+      const live = bookings.filter(
+        (b) => b.hotelId === hotel.id && b.status !== "cancelled"
+      )
+      const staying = live.filter((b) => datesInRange(b.checkIn, b.checkOut).includes(today))
+      const rooms = hotel.rooms.reduce((sum, r) => sum + r.units, 0)
+      const revenueToday = staying.reduce(
+        (sum, b) => sum + Math.round(b.pricing.total / Math.max(b.pricing.nights, 1)),
+        0
+      )
+      const published = reviews.filter(
+        (r) => r.hotelId === hotel.id && r.status === "published"
+      )
+
+      return {
+        id: hotel.id,
+        name: hotel.name,
+        city: hotel.city,
+        country: hotel.country,
+        seed: hotel.seed,
+        rooms,
+        occupancy: Math.round((staying.length / Math.max(rooms, 1)) * 100),
+        adr: staying.length ? Math.round(revenueToday / staying.length) : hotel.pricePerNight,
+        revenueToday,
+        rating: deriveRating(published).rating,
+        reviewCount: published.length,
+      }
+    })
+
+    const arrivingToday = bookings.filter(
+      (b) =>
+        partnerHotelIds.includes(b.hotelId) && b.status !== "cancelled" && b.checkIn === today
+    ).length
+
+    return {
+      rows,
+      totalProperties: rows.length,
+      totalRooms: rows.reduce((sum, p) => sum + p.rooms, 0),
+      todaysArrivals: arrivingToday,
+      todaysRevenue: rows.reduce((sum, p) => sum + p.revenueToday, 0),
+      occupancy: Math.round(
+        rows.reduce((sum, p) => sum + p.occupancy, 0) / Math.max(rows.length, 1)
+      ),
+      adr: Math.round(rows.reduce((sum, p) => sum + p.adr, 0) / Math.max(rows.length, 1)),
+    }
+  }, [hotels, bookings, reviews])
+}
 
 export function usePartnerStats() {
   const reservations = usePartnerReservations()

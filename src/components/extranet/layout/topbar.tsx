@@ -4,7 +4,8 @@ import * as React from "react"
 import Link from "next/link"
 import { Building2, ChevronDown, Menu } from "lucide-react"
 
-import { properties, activeProperty, currentUser } from "@/data/extranet"
+import { usePartnerHotels, useActiveHotel } from "@/store/selectors"
+import { useStore } from "@/store"
 import { avatarImage } from "@/lib/images"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -28,14 +29,20 @@ import { ExtranetSidebar } from "./sidebar"
 import { NotificationsMenu } from "./notifications-menu"
 import { TopbarSearch } from "./topbar-search"
 
-const initials = currentUser.name
+const initialsOf = (name: string) => name
   .split(" ")
   .map((p) => p[0])
   .join("")
 
 export function ExtranetTopbar() {
   const [open, setOpen] = React.useState(false)
-  const [property, setProperty] = React.useState(activeProperty.name)
+  // Profile and portfolio come from the store, so a rename on either the
+  // Account screen or a property screen shows up here immediately.
+  const partner = useStore((s) => s.partner)
+  const hotels = usePartnerHotels()
+  const activeHotel = useActiveHotel()
+  const [property, setProperty] = React.useState(activeHotel?.name ?? "")
+  const initials = initialsOf(partner.name)
 
   return (
     <header className="bg-background sticky top-0 z-40 w-full border-b">
@@ -68,22 +75,22 @@ export function ExtranetTopbar() {
             render={
               <Button variant="outline" size="sm" className="gap-2">
                 <Building2 className="size-4" />
-                <span className="max-w-[9rem] truncate">{property}</span>
+                <span className="max-w-[9rem] truncate">{property || activeHotel?.name}</span>
                 <ChevronDown className="size-4 opacity-60" />
               </Button>
             }
           />
           <DropdownMenuContent align="start" className="w-60">
             <DropdownMenuLabel>Switch property</DropdownMenuLabel>
-            {properties.map((p) => (
+            {hotels.map((h) => (
               <DropdownMenuItem
-                key={p.id}
-                onClick={() => setProperty(p.name)}
+                key={h.id}
+                onClick={() => setProperty(h.name)}
                 className="flex-col items-start gap-0"
               >
-                <span className="font-medium">{p.name}</span>
+                <span className="font-medium">{h.name}</span>
                 <span className="text-muted-foreground text-xs">
-                  {p.city} · {p.rooms} rooms
+                  {h.city} · {h.rooms.reduce((sum, r) => sum + r.units, 0)} rooms
                 </span>
               </DropdownMenuItem>
             ))}
@@ -109,17 +116,17 @@ export function ExtranetTopbar() {
                 >
                   <Avatar size="sm">
                     <AvatarImage
-                      src={avatarImage(currentUser.seed)}
-                      alt={currentUser.name}
+                      src={avatarImage(partner.seed)}
+                      alt={partner.name}
                     />
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <span className="hidden text-left leading-tight lg:block">
                     <span className="block text-sm font-medium">
-                      {currentUser.name}
+                      {partner.name}
                     </span>
                     <span className="text-muted-foreground block text-xs">
-                      {currentUser.role}
+                      {partner.role}
                     </span>
                   </span>
                   <ChevronDown className="hidden size-4 opacity-60 lg:block" />
@@ -129,10 +136,10 @@ export function ExtranetTopbar() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="flex flex-col">
                 <span className="text-foreground text-sm font-medium">
-                  {currentUser.name}
+                  {partner.name}
                 </span>
                 <span className="text-muted-foreground text-xs font-normal">
-                  {currentUser.email}
+                  {partner.email}
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

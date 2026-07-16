@@ -1,49 +1,6 @@
-import type { GuestComm, Message, SupportTicket } from "@/lib/extranet/types"
+import type { GuestComm } from "@/lib/extranet/types"
 
 /* ------------------------------- Support ------------------------------- */
-
-export const supportTickets: SupportTicket[] = [
-  {
-    id: "SUP-002",
-    subject: "AC not working in room 305",
-    guest: "Ava Thompson",
-    category: "Maintenance",
-    priority: "High",
-    status: "Open",
-    updated: "4 hours ago",
-    preview: "The air conditioning in room 305 isn't cooling.",
-    seed: "ava-thompson",
-  },
-  {
-    id: "SUP-001",
-    subject: "Billing discrepancy on invoice",
-    guest: "Olivia Williams",
-    category: "Billing",
-    priority: "Medium",
-    status: "Resolved",
-    updated: "2 days ago",
-    preview: "I was charged twice for invoice STY-INV-0588.",
-    seed: "olivia-williams",
-  },
-]
-
-export const supportThreads: Record<string, Message[]> = {
-  "SUP-002": [
-    { id: "s2m1", from: "guest", text: "The air conditioning in room 305 isn't cooling.", time: "Today 8:05 AM" },
-    { id: "s2m2", from: "host", text: "Sorry about that — our maintenance team is on the way and will arrive within the hour.", time: "Today 8:12 AM" },
-  ],
-  "SUP-001": [
-    { id: "s1m1", from: "guest", text: "I was charged twice for invoice STY-INV-0588. Can you check?", time: "Mon 10:14 AM" },
-    { id: "s1m2", from: "host", text: "Thanks Olivia — we've located the duplicate charge and issued a refund.", time: "Mon 11:02 AM" },
-    { id: "s1m3", from: "guest", text: "Received, thank you!", time: "Mon 11:20 AM" },
-  ],
-}
-
-export const supportStats = {
-  total: supportTickets.length,
-  open: supportTickets.filter((t) => t.status === "Open").length,
-  resolved: supportTickets.filter((t) => t.status === "Resolved").length,
-}
 
 export const guestCommunications: GuestComm[] = [
   { id: "gc1", guest: "Emma Richardson", stayStatus: "In-Stay", message: "Thank you! Looking forward to our stay.", property: "The Ritz-Carlton", room: "Deluxe Ocean Suite · 301", channel: "Direct", time: "2m ago", messages: 5, seed: "emma-richardson" },

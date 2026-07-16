@@ -27,15 +27,27 @@ export function ReviewsView() {
   const [picked, setPicked] = React.useState<Booking | null>(null)
   const [dismissedDeepLink, setDismissedDeepLink] = React.useState(false)
 
-  // Deep link from a booking card ("Write a review") or a hotel page. Derived
-  // rather than pushed into state by an effect, so the dialog opens on the
-  // first render instead of a second one.
+  // Deep links from a booking card (?booking=STY-…) and from a hotel page
+  // (?hotel=…, which resolves to that hotel's reviewable stay). Derived rather
+  // than pushed into state by an effect, so the dialog opens on the first
+  // render instead of a second one.
   const bookingParam = params.get("booking")
-  const deepLinked =
-    bookingParam && !dismissedDeepLink
-      ? (reviewable.find((b) => b.id === bookingParam) ?? null)
-      : null
+  const hotelParam = params.get("hotel")
+  const deepLinked = dismissedDeepLink
+    ? null
+    : (bookingParam
+        ? (reviewable.find((b) => b.id === bookingParam) ?? null)
+        : hotelParam
+          ? (reviewable.find((b) => b.hotelId === hotelParam) ?? null)
+          : null)
   const writing = picked ?? deepLinked
+
+  // A hotel-page link for a stay the guest never had would otherwise land on a
+  // silent page — tell them why there's nothing to write.
+  const hotelName = hotelParam
+    ? (hotels.find((h) => h.id === hotelParam)?.name ?? null)
+    : null
+  const nothingToReview = Boolean(hotelParam) && !deepLinked && !picked
 
   function closeDialog() {
     setPicked(null)
@@ -49,6 +61,12 @@ export function ReviewsView() {
           My Reviews
         </h1>
       </div>
+
+      {nothingToReview ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
+          You can review {hotelName ?? "a hotel"} once you&apos;ve completed a stay there.
+        </div>
+      ) : null}
 
       {/* Stays you can review — the entry point that never existed */}
       {reviewable.length > 0 ? (

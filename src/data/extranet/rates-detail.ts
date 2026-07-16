@@ -6,7 +6,6 @@ import type {
   OpenCloseRoom,
   PricingRow,
   RestrictionRule,
-  ValueAdd,
 } from "@/lib/extranet/types"
 
 /* ------------------------------- Calendar ------------------------------ */
@@ -150,22 +149,3 @@ export const mobileRates: MobileRate[] = [
 ]
 
 /* ------------------------------ Value Adds ----------------------------- */
-
-export const valueAdds: ValueAdd[] = [
-  { id: "va1", name: "Airport Transfer", category: "Transportation", description: "Private transfer to and from the airport.", price: "$65", status: "Active" },
-  { id: "va2", name: "Early Check-in", category: "Convenience", description: "Check in from 12:00 PM, subject to availability.", price: "$35", status: "Active" },
-  { id: "va3", name: "Late Check-out", category: "Convenience", description: "Check out until 3:00 PM, subject to availability.", price: "$45", status: "Active" },
-  { id: "va4", name: "Champagne on Arrival", category: "Romance", description: "A chilled bottle of champagne in your room.", price: "$85", status: "Active" },
-  { id: "va5", name: "Spa Treatment", category: "Wellness", description: "60-minute signature massage at our spa.", price: "$120/person", status: "Active" },
-  { id: "va6", name: "Romantic Dinner Setup", category: "Romance", description: "Private candlelit dinner for two.", price: "$195", status: "Active" },
-  { id: "va7", name: "Pet Welcome Kit", category: "Pets", description: "Bed, bowls and treats for your pet.", price: "$25", status: "Inactive" },
-  { id: "va8", name: "Ski Equipment Rental", category: "Activities", description: "Full ski set rental, per day.", price: "$45/day", status: "Active" },
-  { id: "va9", name: "Babysitting Service", category: "Family", description: "Certified in-room childcare.", price: "$30/hr", status: "Active" },
-  { id: "va10", name: "Guided City Tour", category: "Activities", description: "Half-day guided tour with a local expert.", price: "$75/person", status: "Active" },
-]
-
-export const valueAddCategories = [
-  "All",
-  ...Array.from(new Set(valueAdds.map((v) => v.category))),
-]
-export const valueAddsActive = valueAdds.filter((v) => v.status === "Active").length

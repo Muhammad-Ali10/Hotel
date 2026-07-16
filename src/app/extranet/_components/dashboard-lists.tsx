@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react"
 import { pendingActions, tips } from "@/data/extranet"
 import { formatDate } from "@/lib/format"
 import { guestName, nightsBetween, toISODate } from "@/lib/domain"
-import { usePartnerReservations } from "@/store/selectors"
+import { usePartnerReservations, usePartnerStats } from "@/store/selectors"
 import {
   ActionButton,
   ConfirmDialog,
@@ -136,11 +136,51 @@ export function UpcomingCheckIns() {
   )
 }
 
+/**
+ * Pending actions. The review and arrival lines are counted from the store —
+ * they used to be fixed copy ("3 guest reviews need a response") sitting next
+ * to a Reviews screen that derived a different number from the same data.
+ */
 export function PendingActions() {
+  const { pendingReviews, awaitingReply } = usePartnerStats()
+  const reservations = usePartnerReservations()
+  const today = toISODate(new Date())
+  const toConfirm = reservations.filter(
+    (r) => r.status === "pending" && r.checkIn >= today
+  ).length
+  const reviewsToAction = pendingReviews + awaitingReply
+
+  const derived: typeof pendingActions = [
+    ...(toConfirm > 0
+      ? [
+          {
+            id: "pa-confirm",
+            title: `${toConfirm} ${toConfirm === 1 ? "reservation requires" : "reservations require"} confirmation`,
+            meta: "Guests are waiting",
+            icon: "CalendarClock",
+          },
+        ]
+      : []),
+    ...(reviewsToAction > 0
+      ? [
+          {
+            id: "pa-reviews",
+            title: `${reviewsToAction} guest ${reviewsToAction === 1 ? "review needs" : "reviews need"} a response`,
+            meta: "Respond within 48h",
+            icon: "MessageSquare",
+          },
+        ]
+      : []),
+    // the rest are genuinely static demo items with no store counterpart
+    ...pendingActions.filter(
+      (a) => !/check-in confirmation|guest reviews/i.test(a.title)
+    ),
+  ]
+
   return (
     <SectionCard title="Pending Actions">
       <ul className="space-y-3">
-        {pendingActions.map((a) => (
+        {derived.map((a) => (
           <li key={a.id} className="flex items-start gap-3">
             <span className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
               <Icon name={a.icon} className="size-4" />

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $3}')",
+      "Bash(python -)",
+      "Bash(npm run *)",
+      "PowerShell(npm run typecheck 2>&1 | Select-String \"error TS\" | ForEach-Object { $_.ToString\\(\\) } | Select-Object -First 10)",
+      "PowerShell(npm run typecheck 2>&1 | Select-String \"error TS\" | ForEach-Object { $_.ToString\\(\\) } | Select-Object -First 8)",
+      "Bash(cat)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

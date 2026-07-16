@@ -1,18 +1,23 @@
 "use client"
 
-import * as React from "react"
+import { toast } from "sonner"
 
-import type { ToggleSetting } from "@/lib/extranet/types"
+import { useStore } from "@/store"
 import { Switch } from "@/components/ui/switch"
 
-export function SettingsToggles({ settings }: { settings: ToggleSetting[] }) {
-  const [state, setState] = React.useState<Record<string, boolean>>(() =>
-    Object.fromEntries(settings.map((s) => [s.id, s.enabled]))
-  )
+/**
+ * Partner preference toggles. These were local `useState` seeded from a static
+ * array — flip one, navigate away, and it was back. They now persist like the
+ * customer's settings do.
+ */
+export function SettingsToggles({ ids }: { ids: string[] }) {
+  const settings = useStore((s) => s.partnerSettings)
+  const setPartnerSetting = useStore((s) => s.setPartnerSetting)
+  const rows = settings.filter((s) => ids.includes(s.id))
 
   return (
     <ul className="divide-y">
-      {settings.map((s) => (
+      {rows.map((s) => (
         <li
           key={s.id}
           className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
@@ -22,10 +27,12 @@ export function SettingsToggles({ settings }: { settings: ToggleSetting[] }) {
             <p className="text-muted-foreground text-xs">{s.description}</p>
           </div>
           <Switch
-            checked={state[s.id]}
-            onCheckedChange={(checked) =>
-              setState((prev) => ({ ...prev, [s.id]: checked }))
-            }
+            checked={s.enabled}
+            aria-label={s.label}
+            onCheckedChange={(checked) => {
+              setPartnerSetting(s.id, checked === true)
+              toast.success(`${s.label} ${checked ? "on" : "off"}`)
+            }}
           />
         </li>
       ))}
