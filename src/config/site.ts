@@ -58,10 +58,10 @@ export const siteConfig = {
     {
       title: "Partners",
       links: [
+        { title: "List your property", href: "/join" },
         { title: "Hotel Partners", href: "#" },
         { title: "Affiliate Program", href: "#" },
         { title: "Travel Agents", href: "#" },
-        { title: "Corporate Travel", href: "#" },
       ],
     },
   ],

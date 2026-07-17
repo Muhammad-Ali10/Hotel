@@ -8,7 +8,20 @@
       "PowerShell(npm run typecheck 2>&1 | Select-String \"error TS\" | ForEach-Object { $_.ToString\\(\\) } | Select-Object -First 8)",
       "Bash(cat)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(cd \"E:/Hotel\" && echo \"=== abhi ka time ===\" && date && echo \"\" && echo \"=== project start \\(git init / pehli scaffold file\\) ===\" && stat -c '%y  %n' .git 2>/dev/null | head -1; stat -c '%y  %n' package-lock.json tsconfig.json 2>/dev/null && echo \"\" && echo \"=== sab se purani source file ===\" && find src -type f -printf '%T+ %p\\\\n' 2>/dev/null | sort | head -3 && echo \"\" && echo \"=== sab se nayi source file ===\" && find src -type f -printf '%T+ %p\\\\n' 2>/dev/null | sort | tail -3)",
+      "Read(//e/Hotel/**)",
+      "Bash(d=\"C:/Users/Muhammad Ali/.claude/projects/E--Hotel\"; echo \"=== projects dir contents ===\"; ls -la \"$d\" 2>/dev/null | head -40; echo \"\"; echo \"=== session files \\(jsonl\\) with dates ===\"; find \"$d\" -maxdepth 1 -name \"*.jsonl\" -printf '%T+  %10s  %f\\\\n' 2>/dev/null | sort)",
+      "Read(//c/Users/Muhammad Ali/.claude/projects/E--Hotel/**)",
+      "Bash(node -e ' *)",
+      "Bash(grep -E \"^src/|src\\\\\\\\\\\\\\\\\")",
+      "Bash(npx eslint *)",
+      "Bash(echo \"=== lint done \\(exit $?\\) ===\")",
+      "Bash(echo \"=== lint exit $? ===\")",
+      "Bash(curl -s \"http://localhost:3411/\")",
+      "Bash(curl -s \"http://localhost:3411/join/property-type\")",
+      "Bash(curl -s \"http://localhost:3411/join/amenities\")",
+      "Bash(pkill -f \"next start -p 3411\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\Muhammad Ali\\.claude\\projects\\E--Hotel\\memory"

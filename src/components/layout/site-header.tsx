@@ -55,6 +55,9 @@ export function SiteHeader() {
             <Link href="/support" className="hover:text-foreground">
               Help
             </Link>
+            <Link href="/join" className="hover:text-foreground">
+              List your property
+            </Link>
           </div>
           <NotificationBell audience="customer" href="/dashboard/notifications" />
           <ModeToggle />
@@ -95,6 +98,13 @@ export function SiteHeader() {
                     {item.title}
                   </Link>
                 ))}
+                <Link
+                  href="/join"
+                  onClick={() => setOpen(false)}
+                  className="hover:bg-muted rounded-md px-3 py-2 text-sm font-medium"
+                >
+                  List your property
+                </Link>
                 <div className="mt-4 flex flex-col gap-2">
                   <Button variant="outline" render={<Link href="/signup">Register</Link>} />
                   <Button render={<Link href="/login">Login</Link>} />
