@@ -13,7 +13,7 @@ export const siteConfig = {
     { title: "Hotels", href: "/hotels" },
     { title: "Offers", href: "/hotels?filter=offers" },
     { title: "Destinations", href: "/hotels?view=destinations" },
-    { title: "About Us", href: "/support#about" },
+    { title: "About Us", href: "/about" },
     { title: "Contact", href: "/support#contact" },
   ] satisfies NavLink[],
 
@@ -31,10 +31,10 @@ export const siteConfig = {
     {
       title: "Company",
       links: [
-        { title: "About Us", href: "/support#about" },
-        { title: "Careers", href: "#" },
-        { title: "Press", href: "#" },
-        { title: "Blog", href: "#" },
+        { title: "About Us", href: "/about" },
+        { title: "Careers", href: "/careers" },
+        { title: "Press", href: "/press" },
+        { title: "Blog", href: "/blog" },
       ],
     },
     {
@@ -42,8 +42,8 @@ export const siteConfig = {
       links: [
         { title: "Help Center", href: "/support" },
         { title: "Contact Us", href: "/support#contact" },
-        { title: "Cancellation Policy", href: "#" },
-        { title: "Terms of Service", href: "#" },
+        { title: "Cancellation Policy", href: "/cancellation-policy" },
+        { title: "Terms of Service", href: "/terms" },
       ],
     },
     {
@@ -59,17 +59,18 @@ export const siteConfig = {
       title: "Partners",
       links: [
         { title: "List your property", href: "/join" },
-        { title: "Hotel Partners", href: "#" },
-        { title: "Affiliate Program", href: "#" },
-        { title: "Travel Agents", href: "#" },
+        { title: "Hotel Partners", href: "/partners/hotels" },
+        { title: "Affiliate Program", href: "/partners/affiliate" },
+        { title: "Travel Agents", href: "/partners/travel-agents" },
       ],
     },
   ],
 
   legal: [
-    { title: "Privacy Policy", href: "#" },
-    { title: "Terms of Use", href: "#" },
-    { title: "Cookies", href: "#" },
+    { title: "Privacy Policy", href: "/privacy" },
+    // Same document as "Terms of Service" in the Support column — one source of truth.
+    { title: "Terms of Use", href: "/terms" },
+    { title: "Cookies", href: "/cookies" },
   ],
 
   socials: [
