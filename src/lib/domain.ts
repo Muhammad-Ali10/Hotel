@@ -281,7 +281,11 @@ function round1(n: number): number {
 
 export type StayCheck =
   | { ok: true }
-  | { ok: false; reason: "closed" | "minStay" | "invalid"; message: string }
+  | {
+      ok: false
+      reason: "closed" | "minStay" | "invalid" | "capacity" | "soldOut"
+      message: string
+    }
 
 /** Validates a stay against the partner's open/close + min-stay rules. */
 export function checkStay(
@@ -316,6 +320,128 @@ export function checkStay(
 export function isSoldOut(availability: Availability, checkIn: string, checkOut: string) {
   const result = checkStay(availability, checkIn, checkOut)
   return !result.ok && result.reason === "closed"
+}
+
+/* ------------------------------------------------------------ inventory -- */
+
+/** Bookings that still hold a room — cancelled ones release their inventory. */
+function holdsInventory(booking: Booking): boolean {
+  return booking.status !== "cancelled"
+}
+
+/**
+ * How many units of one room type are committed on a single night.
+ *
+ * `ignoreBookingId` excludes the booking currently being edited, so a guest
+ * moving their own reservation isn't blocked by the room they already hold.
+ */
+export function unitsBookedOn(
+  bookings: Booking[],
+  hotelId: string,
+  roomId: string,
+  iso: string,
+  ignoreBookingId?: string
+): number {
+  return bookings.filter(
+    (b) =>
+      b.hotelId === hotelId &&
+      b.roomId === roomId &&
+      b.id !== ignoreBookingId &&
+      holdsInventory(b) &&
+      // a stay occupies [checkIn, checkOut) — the departure night is free
+      b.checkIn <= iso &&
+      b.checkOut > iso
+  ).length
+}
+
+/**
+ * Units of a room type still sellable across a whole stay — the tightest
+ * night wins, because one full night blocks the entire reservation.
+ */
+export function unitsLeft(
+  room: Room,
+  bookings: Booking[],
+  hotelId: string,
+  checkIn: string,
+  checkOut: string,
+  ignoreBookingId?: string
+): number {
+  const nights = datesInRange(checkIn, checkOut)
+  if (nights.length === 0) return room.units
+  return nights.reduce(
+    (fewest, iso) =>
+      Math.min(fewest, room.units - unitsBookedOn(bookings, hotelId, room.id, iso, ignoreBookingId)),
+    room.units
+  )
+}
+
+/**
+ * Property-level availability for a search result: open on those dates, meets
+ * the min stay, and has at least one room type with units left. The listing
+ * only ever asked the calendar, so a fully-booked property still rendered as
+ * bookable right up until the guest reached the reserve card.
+ */
+export function checkHotelAvailability(
+  hotel: Hotel,
+  bookings: Booking[],
+  checkIn: string,
+  checkOut: string
+): StayCheck {
+  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  if (!stay.ok) return stay
+
+  const anyRoomLeft = hotel.rooms.some(
+    (room) => unitsLeft(room, bookings, hotel.id, checkIn, checkOut) > 0
+  )
+  if (!anyRoomLeft) {
+    return { ok: false, reason: "soldOut", message: "Sold out for your dates." }
+  }
+  return { ok: true }
+}
+
+/**
+ * THE booking gate. `checkStay` only ever knew the property's calendar rules;
+ * nothing checked whether the room could physically take the party, or whether
+ * any units were left — `Room.units` and `Room.guests` were decorative, so the
+ * same suite could be sold without limit and six people could book a double.
+ *
+ * Every surface that can create or move a reservation calls this.
+ */
+export function checkAvailability(input: {
+  hotel: Hotel
+  room: Room
+  checkIn: string
+  checkOut: string
+  guests: number
+  bookings: Booking[]
+  /** the reservation being modified, excluded from the inventory count */
+  ignoreBookingId?: string
+}): StayCheck {
+  const { hotel, room, checkIn, checkOut, guests, bookings, ignoreBookingId } = input
+
+  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  if (!stay.ok) return stay
+
+  if (guests > room.guests) {
+    return {
+      ok: false,
+      reason: "capacity",
+      message: `The ${room.name} sleeps ${room.guests} ${
+        room.guests === 1 ? "guest" : "guests"
+      }. Choose a larger room or reduce the party size.`,
+    }
+  }
+
+  const left = unitsLeft(room, bookings, hotel.id, checkIn, checkOut, ignoreBookingId)
+  if (left <= 0) {
+    return {
+      ok: false,
+      reason: "soldOut",
+      message: `The ${room.name} is fully booked for these dates.`,
+    }
+  }
+
+  return { ok: true }
 }
 
 /* --------------------------------------------------------- promotions --- */

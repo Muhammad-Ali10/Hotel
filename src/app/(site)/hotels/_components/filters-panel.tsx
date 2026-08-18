@@ -2,7 +2,6 @@
 
 import type { PropertyType } from "@/types"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
@@ -182,14 +181,6 @@ export function FiltersPanel({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      <Button
-        variant="outline"
-        className="mt-2 w-full"
-        onClick={() => onChange({ ...defaultFilters, price: maxPrice })}
-      >
-        Reset All
-      </Button>
     </div>
   )
 }

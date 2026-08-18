@@ -1,7 +1,7 @@
 import { BedDouble } from "lucide-react"
 
 import type { UnitDraft } from "../_lib/types"
-import { pkr } from "../_lib/labels"
+import { money } from "../_lib/labels"
 
 /** Compact summary of an added unit — name + capacity + bath + price. */
 export function UnitRow({ unit }: { unit: UnitDraft }) {
@@ -17,7 +17,7 @@ export function UnitRow({ unit }: { unit: UnitDraft }) {
     `${unit.guests} guests`,
     `${beds} bed${beds === 1 ? "" : "s"}`,
     bath,
-    `${pkr(unit.price)}/night`,
+    `${money(unit.price)}/night`,
   ].join("  ·  ")
 
   return (

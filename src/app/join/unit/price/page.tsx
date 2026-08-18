@@ -11,13 +11,21 @@ import { Slider } from "@/components/ui/slider"
 import { WizardShell, StepHeading } from "../../_components/wizard-shell"
 import { TipPanel } from "../../_components/tip-panel"
 import { StepNav } from "../../_components/step-nav"
-import { useWizard } from "../../_components/wizard-provider"
-import { pkr } from "../../_lib/labels"
+import { PARTNER_ORG } from "@/data/config"
 
-const MIN = 3500
-const MAX = 30000
-const MEDIAN = 6500
-const COMMISSION = 0.12
+import { useWizard } from "../../_components/wizard-provider"
+import { money } from "../../_lib/labels"
+
+/**
+ * USD nightly rates, sized against the live catalogue (base rates run
+ * $383–$1,500). These were rupee figures — 3,500–30,000 — which, once the flow
+ * started formatting in USD, would have offered a luxury property a $3,500
+ * floor. The commission is the platform rate the extranet and admin quote.
+ */
+const MIN = 120
+const MAX = 3000
+const MEDIAN = 550
+const COMMISSION = PARTNER_ORG.commissionRate / 100
 
 const perks = [
   "24/7 guest support included",
@@ -27,7 +35,7 @@ const perks = [
 
 export default function RoomPricePage() {
   const { data, update } = useWizard()
-  const [price, setPrice] = React.useState(data.draftUnit.price || 14000)
+  const [price, setPrice] = React.useState(data.draftUnit.price || MEDIAN)
 
   const commission = Math.round(price * COMMISSION)
   const earnings = price - commission
@@ -68,13 +76,13 @@ export default function RoomPricePage() {
             onValueChange={(v) => setPrice(Array.isArray(v) ? v[0] : (v as number))}
           />
           <div className="text-muted-foreground mt-2 flex items-center justify-between text-xs">
-            <span>Low · {pkr(MIN)}</span>
-            <span>High · {pkr(MAX)}</span>
+            <span>Low · {money(MIN)}</span>
+            <span>High · {money(MAX)}</span>
           </div>
         </div>
         <p className="text-muted-foreground mt-3 text-sm">
-          Median: <span className="text-foreground font-medium">{pkr(MEDIAN)}</span> — Yours:{" "}
-          <span className="text-foreground font-medium">{pkr(price)}</span>
+          Median: <span className="text-foreground font-medium">{money(MEDIAN)}</span> — Yours:{" "}
+          <span className="text-foreground font-medium">{money(price)}</span>
         </p>
       </div>
 
@@ -105,15 +113,15 @@ export default function RoomPricePage() {
         <div className="divide-y text-sm">
           <div className="flex justify-between py-2">
             <span className="text-muted-foreground">Price guests pay</span>
-            <span className="font-medium">{pkr(price)}</span>
+            <span className="font-medium">{money(price)}</span>
           </div>
           <div className="flex justify-between py-2">
             <span className="text-muted-foreground">Platform commission (12%)</span>
-            <span className="font-medium">−{pkr(commission)}</span>
+            <span className="font-medium">−{money(commission)}</span>
           </div>
           <div className="flex justify-between py-2">
             <span className="font-medium">Your earnings (including taxes)</span>
-            <span className="font-semibold">{pkr(earnings)}</span>
+            <span className="font-semibold">{money(earnings)}</span>
           </div>
         </div>
       </div>

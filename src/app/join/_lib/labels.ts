@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/format"
+
 import type { PropertyType } from "./types"
 
 export const propertyTypeLabels: Record<PropertyType, string> = {
@@ -11,7 +13,14 @@ export const propertyTypeLabels: Record<PropertyType, string> = {
   motel: "Motel",
 }
 
-/** Format a whole-rupee amount as "PKR 12,345" / "Rs 12,345". */
-export function pkr(amount: number, symbol: "PKR" | "Rs" = "Rs") {
-  return `${symbol} ${new Intl.NumberFormat("en-US").format(Math.round(amount))}`
+/**
+ * Money in the registration flow.
+ *
+ * This flow used to price in rupees while the catalogue, checkout, extranet and
+ * admin panel all priced in USD — a partner set a rate here and saw a different
+ * currency the moment they reached the extranet. It now goes through the same
+ * platform formatter as every other surface.
+ */
+export function money(amount: number) {
+  return formatCurrency(Math.round(amount))
 }

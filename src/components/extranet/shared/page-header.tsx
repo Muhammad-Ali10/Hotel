@@ -12,16 +12,23 @@ export function PageHeader({
   children,
   className,
   showBreadcrumbs = true,
+  breadcrumbNav,
+  breadcrumbRoot,
 }: {
   title: string
   subtitle?: string
   children?: React.ReactNode
   className?: string
   showBreadcrumbs?: boolean
+  /** Override the nav the breadcrumb trail is built from (admin passes its own). */
+  breadcrumbNav?: React.ComponentProps<typeof Breadcrumbs>["nav"]
+  breadcrumbRoot?: string
 }) {
   return (
     <div className="space-y-3">
-      {showBreadcrumbs ? <Breadcrumbs /> : null}
+      {showBreadcrumbs ? (
+        <Breadcrumbs nav={breadcrumbNav} root={breadcrumbRoot} />
+      ) : null}
       <div
         className={cn(
           "flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between",

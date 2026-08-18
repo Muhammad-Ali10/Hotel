@@ -410,6 +410,11 @@ function build(seed: Seed): Booking {
 
   return {
     id: seed.id,
+    // The seeded trips that belong to the demo account are the ones booked
+    // under its email; everything else arrived through an OTA and has no
+    // platform account behind it. This is the only place the email is allowed
+    // to imply ownership — from here on the id is what's read.
+    customerId: seed.guest.email === userProfile.email ? userProfile.id : undefined,
     hotelId: hotel.id,
     roomId: room.id,
     hotelName: hotel.name,

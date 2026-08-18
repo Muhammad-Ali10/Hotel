@@ -135,7 +135,7 @@ export const initialData: RegistrationData = {
   cancellationPolicy: null,
   houseRules: [],
 
-  payoutCurrency: "PKR",
+  payoutCurrency: "USD",
   accountHolder: "",
   bankName: "",
   iban: "",

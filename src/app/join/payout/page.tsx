@@ -19,15 +19,18 @@ import { TipPanel } from "../_components/tip-panel"
 import { StepNav } from "../_components/step-nav"
 import { useWizard } from "../_components/wizard-provider"
 
-const currencies = ["PKR", "USD", "EUR", "GBP", "AED"].map((v) => ({ value: v, label: v }))
+// USD first — it's the platform settlement currency every other surface quotes.
+const currencies = ["USD", "EUR", "GBP", "AED"].map((v) => ({ value: v, label: v }))
+// The catalogue is international (New York, Paris, Tokyo, Dubai, Malé); the
+// Pakistan-only bank list came straight from the Figma and matched nothing.
 const banks = [
   "Standard Chartered",
-  "HBL",
-  "Meezan Bank",
-  "UBL",
-  "MCB Bank",
-  "Allied Bank",
-  "Bank Alfalah",
+  "HSBC",
+  "Citibank",
+  "Barclays",
+  "Deutsche Bank",
+  "Emirates NBD",
+  "Other / international transfer",
 ].map((v) => ({ value: v, label: v }))
 
 export default function PayoutPage() {

@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { WizardShell } from "../_components/wizard-shell"
 import { SummaryList } from "../_components/summary"
 import { useWizard } from "../_components/wizard-provider"
-import { propertyTypeLabels, pkr } from "../_lib/labels"
+import { propertyTypeLabels, money } from "../_lib/labels"
 
 export default function DonePage() {
   const { data } = useWizard()
@@ -49,7 +49,7 @@ export default function DonePage() {
                 { label: "Location", value: location || "—" },
                 { label: "Units", value: units },
                 { label: "Photos", value: data.photos },
-                { label: "Base rate", value: pkr(data.baseRate, "PKR") },
+                { label: "Base rate", value: money(data.baseRate) },
                 { label: "Contract type", value: contract },
               ]}
             />

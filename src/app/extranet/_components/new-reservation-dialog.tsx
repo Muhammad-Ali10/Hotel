@@ -4,7 +4,13 @@ import * as React from "react"
 import { Plus } from "lucide-react"
 import { toast } from "sonner"
 
-import { addDays, checkStay, formatDiscount, priceBooking, toISODate } from "@/lib/domain"
+import {
+  addDays,
+  checkAvailability,
+  formatDiscount,
+  priceBooking,
+  toISODate,
+} from "@/lib/domain"
 import { formatCurrency } from "@/lib/format"
 import { arrivalTimeSlots } from "@/data/config"
 import { useStore } from "@/store"
@@ -30,7 +36,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const guestItems = [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: String(n) }))
+/** Capped at what the selected room sleeps — the picker offered six regardless. */
+function guestOptions(max: number) {
+  return Array.from({ length: Math.max(max, 1) }, (_, i) => i + 1).map((n) => ({
+    value: String(n),
+    label: String(n),
+  }))
+}
 
 /**
  * Creates a real reservation for one of the partner's properties — a phone or
@@ -44,6 +56,7 @@ export function NewReservationDialog() {
   const hotels = usePartnerHotels()
   const createBooking = useStore((s) => s.createBooking)
   const setBookingStatus = useStore((s) => s.setBookingStatus)
+  const bookings = useStore((s) => s.bookings)
   const [open, setOpen] = React.useState(false)
 
   const today = toISODate(new Date())
@@ -70,7 +83,20 @@ export function NewReservationDialog() {
       label: `${r.name} — ${formatCurrency(r.pricePerNight)}`,
     })) ?? []
 
-  const stay = hotel ? checkStay(hotel.availability, form.checkIn, form.checkOut) : null
+  const guestItems = guestOptions(room?.guests ?? 2)
+  const partySize = Math.min(Number(form.guests), room?.guests ?? Number(form.guests))
+
+  const stay =
+    hotel && room
+      ? checkAvailability({
+          hotel,
+          room,
+          checkIn: form.checkIn,
+          checkOut: form.checkOut,
+          guests: partySize,
+          bookings,
+        })
+      : null
   const pricing =
     hotel && room && stay?.ok
       ? priceBooking({
@@ -78,7 +104,7 @@ export function NewReservationDialog() {
           room,
           checkIn: form.checkIn,
           checkOut: form.checkOut,
-          guests: Number(form.guests),
+          guests: partySize,
         })
       : null
 
@@ -97,7 +123,10 @@ export function NewReservationDialog() {
       return
     }
 
-    const booking = createBooking({
+    // No `customerId`: a phone or walk-in booking has a guest but no platform
+    // account behind it, and stamping one would file a stranger's stay under
+    // the signed-in customer.
+    const result = createBooking({
       hotelId: hotel.id,
       roomId: room.id,
       guest: {
@@ -109,16 +138,20 @@ export function NewReservationDialog() {
       },
       checkIn: form.checkIn,
       checkOut: form.checkOut,
-      guests: Number(form.guests),
+      guests: partySize,
       arrivalTime: arrivalTimeSlots[0],
       specialRequests: "",
       addOns: [],
       payment: { method: "property", status: "pending" },
     })
+    if (!result.ok) {
+      toast.error("Couldn't create that reservation", { description: result.message })
+      return
+    }
     // Taken by the property, not through the site.
-    setBookingStatus(booking.id, "confirmed")
+    setBookingStatus(result.data.id, "confirmed")
 
-    toast.success(`${booking.id} created for ${form.firstName} ${form.lastName}.`)
+    toast.success(`${result.data.id} created for ${form.firstName} ${form.lastName}.`)
     setForm({ ...form, firstName: "", lastName: "", email: "", phone: "" })
     setOpen(false)
   }
@@ -243,7 +276,7 @@ export function NewReservationDialog() {
               <Label>Guests</Label>
               <Select
                 items={guestItems}
-                value={form.guests}
+                value={String(partySize)}
                 onValueChange={(v) => set({ guests: String(v) })}
               >
                 <SelectTrigger className="w-full">

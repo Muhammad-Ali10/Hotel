@@ -198,13 +198,15 @@ function FieldButton({
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+        <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
           {label}
         </span>
+        {/* Was `text-muted-foreground/70`, which measures ≈2.4:1 against the
+            card — below the 4.5:1 AA floor. Full strength is ≈6.3:1. */}
         <span
           className={cn(
             "truncate text-sm font-medium",
-            !filled && "text-muted-foreground/70 font-normal"
+            !filled && "text-muted-foreground font-normal"
           )}
         >
           {filled ? value : placeholder}
@@ -383,7 +385,7 @@ function GuestsField({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="size-8 rounded-full"
+                  className="size-11 rounded-full"
                   disabled={guests[row.key] <= row.min}
                   onClick={() =>
                     onChange({ ...guests, [row.key]: guests[row.key] - 1 })
@@ -399,7 +401,7 @@ function GuestsField({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="size-8 rounded-full"
+                  className="size-11 rounded-full"
                   onClick={() =>
                     onChange({ ...guests, [row.key]: guests[row.key] + 1 })
                   }

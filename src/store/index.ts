@@ -7,6 +7,7 @@ import type {
   AppNotification,
   Booking,
   BookingAddOn,
+  BookingSource,
   BookingStatus,
   Discount,
   Hotel,
@@ -27,6 +28,7 @@ import type {
   ValueAdd,
 } from "@/types"
 import {
+  checkAvailability,
   makeBookingRef,
   makeTicketRef,
   nightsBetween,
@@ -54,6 +56,15 @@ type CreateBookingInput = {
   specialRequests: string
   addOns: BookingAddOn[]
   payment: Booking["payment"]
+  /**
+   * The account the booking belongs to. Stated by the caller, never inferred:
+   * the public checkout passes the signed-in customer, while a walk-in the
+   * property enters itself has a guest but no platform account — defaulting it
+   * would drop a stranger's reservation into the customer's dashboard.
+   */
+  customerId?: string
+  /** Defaults to Direct — the public site and the property's own desk. */
+  source?: BookingSource
 }
 
 type NewReviewInput = {
@@ -78,14 +89,21 @@ type NewTicketInput = {
   bookingId?: string
 }
 
+/**
+ * Every write that can be rejected returns this instead of throwing. The store
+ * is where the API will eventually sit, so the callers already handle a refusal
+ * — the UI's own validation is a courtesy, not the gate.
+ */
+export type WriteResult<T> = { ok: true; data: T } | { ok: false; message: string }
+
 type Actions = {
   /* bookings */
-  createBooking: (input: CreateBookingInput) => Booking
+  createBooking: (input: CreateBookingInput) => WriteResult<Booking>
   cancelBooking: (id: string, reason: string, by?: "guest" | "hotel") => void
   modifyBooking: (
     id: string,
     changes: { checkIn: string; checkOut: string; guests: number; specialRequests?: string }
-  ) => void
+  ) => WriteResult<Booking>
   setBookingStatus: (id: string, status: BookingStatus) => void
   assignRoomNo: (id: string, roomNo: string) => void
 
@@ -172,6 +190,21 @@ function repriceAddOns(
     .filter((a) => a !== null)
 }
 
+/**
+ * A booking reference that isn't already taken. STY-XXXXXX has ~1.07bn
+ * combinations, so a clash is rare — but "rare" is not "never", and the
+ * reference is the primary key every surface looks a booking up by.
+ */
+function uniqueBookingRef(existing: Booking[]): string {
+  const taken = new Set(existing.map((b) => b.id))
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const ref = makeBookingRef()
+    if (!taken.has(ref)) return ref
+  }
+  // Astronomically unlikely; a suffix is still better than a duplicate key.
+  return `${makeBookingRef()}${taken.size}`
+}
+
 function pushNotification(
   state: AppState,
   n: Omit<AppNotification, "id" | "createdAt" | "read">
@@ -190,8 +223,27 @@ export const useStore = create<Store>()(
       /* ------------------------------------------------------- bookings -- */
 
       createBooking: (input) => {
-        const hotel = get().hotels.find((h) => h.id === input.hotelId)!
-        const room = hotel.rooms.find((r) => r.id === input.roomId)!
+        const state = get()
+        const hotel = state.hotels.find((h) => h.id === input.hotelId)
+        const room = hotel?.rooms.find((r) => r.id === input.roomId)
+        if (!hotel || !room) {
+          return { ok: false, message: "That room is no longer offered by the property." }
+        }
+
+        // Re-validated here, not just in the form. The checkout screen is one
+        // caller among several and its query string is user-editable — the
+        // rules have to hold at the write, which is where the API will enforce
+        // them too.
+        const available = checkAvailability({
+          hotel,
+          room,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+          guests: input.guests,
+          bookings: state.bookings,
+        })
+        if (!available.ok) return { ok: false, message: available.message }
+
         const pricing = priceBooking({
           hotel,
           room,
@@ -202,7 +254,11 @@ export const useStore = create<Store>()(
         })
 
         const booking: Booking = {
-          id: makeBookingRef(),
+          id: uniqueBookingRef(state.bookings),
+          // Never derived from the email the guest typed — they can change that
+          // field at checkout, and the booking used to disappear from their own
+          // dashboard when they did.
+          customerId: input.customerId,
           hotelId: hotel.id,
           roomId: room.id,
           hotelName: hotel.name,
@@ -219,7 +275,7 @@ export const useStore = create<Store>()(
           pricing,
           payment: input.payment,
           status: "confirmed",
-          source: "Direct",
+          source: input.source ?? "Direct",
           createdAt: stamp(),
         }
 
@@ -255,7 +311,7 @@ export const useStore = create<Store>()(
           ],
         }))
 
-        return booking
+        return { ok: true, data: booking }
       },
 
       cancelBooking: (id, reason, by = "guest") => {
@@ -290,53 +346,74 @@ export const useStore = create<Store>()(
       },
 
       modifyBooking: (id, changes) => {
-        set((state) => ({
-          bookings: state.bookings.map((b) => {
-            if (b.id !== id) return b
-            const hotel = state.hotels.find((h) => h.id === b.hotelId)
-            const room = hotel?.rooms.find((r) => r.id === b.roomId)
-            if (!hotel || !room) return b
+        const state = get()
+        const current = state.bookings.find((b) => b.id === id)
+        if (!current) return { ok: false, message: "That reservation no longer exists." }
+        if (current.status === "cancelled") {
+          return { ok: false, message: "A cancelled reservation can't be changed." }
+        }
 
-            const nights = nightsBetween(changes.checkIn, changes.checkOut)
-            // Add-ons are re-resolved against the NEW nights and party size.
-            // Carrying the stored prices through left a per-person breakfast at
-            // its two-guest price after the booking grew to four.
-            const addOns = repriceAddOns(b.addOns, hotel, {
-              nights,
-              guests: changes.guests,
-            })
+        const hotel = state.hotels.find((h) => h.id === current.hotelId)
+        const room = hotel?.rooms.find((r) => r.id === current.roomId)
+        if (!hotel || !room) {
+          return { ok: false, message: "That room is no longer offered by the property." }
+        }
 
-            return {
-              ...b,
-              checkIn: changes.checkIn,
-              checkOut: changes.checkOut,
-              guests: changes.guests,
-              specialRequests: changes.specialRequests ?? b.specialRequests,
-              addOns,
-              // re-priced against the same rules the guest booked under
-              pricing: priceBooking({
-                hotel,
-                room,
-                checkIn: changes.checkIn,
-                checkOut: changes.checkOut,
-                guests: changes.guests,
-                addOns,
-              }),
-            }
+        // The same gate `createBooking` uses. Moving a stay is a new claim on
+        // inventory and this path had no validation at all — a guest could
+        // shift their booking onto sold-out nights or grow the party past what
+        // the room sleeps. The reservation's own units are excluded so it
+        // doesn't block itself.
+        const available = checkAvailability({
+          hotel,
+          room,
+          checkIn: changes.checkIn,
+          checkOut: changes.checkOut,
+          guests: changes.guests,
+          bookings: state.bookings,
+          ignoreBookingId: id,
+        })
+        if (!available.ok) return { ok: false, message: available.message }
+
+        const nights = nightsBetween(changes.checkIn, changes.checkOut)
+        // Add-ons are re-resolved against the NEW nights and party size.
+        // Carrying the stored prices through left a per-person breakfast at
+        // its two-guest price after the booking grew to four.
+        const addOns = repriceAddOns(current.addOns, hotel, {
+          nights,
+          guests: changes.guests,
+        })
+
+        const updated: Booking = {
+          ...current,
+          checkIn: changes.checkIn,
+          checkOut: changes.checkOut,
+          guests: changes.guests,
+          specialRequests: changes.specialRequests ?? current.specialRequests,
+          addOns,
+          // re-priced against the same rules the guest booked under
+          pricing: priceBooking({
+            hotel,
+            room,
+            checkIn: changes.checkIn,
+            checkOut: changes.checkOut,
+            guests: changes.guests,
+            addOns,
           }),
-        }))
+        }
 
-        const booking = get().bookings.find((b) => b.id === id)
-        if (!booking) return
-        set((state) => ({
-          notifications: pushNotification(state, {
+        set((s) => ({
+          bookings: s.bookings.map((b) => (b.id === id ? updated : b)),
+          notifications: pushNotification(s, {
             audience: "partner",
             type: "booking",
             title: "Reservation modified",
-            message: `${booking.guest.firstName} ${booking.guest.lastName} changed ${booking.id} to ${booking.checkIn} → ${booking.checkOut}.`,
+            message: `${updated.guest.firstName} ${updated.guest.lastName} changed ${updated.id} to ${updated.checkIn} → ${updated.checkOut}.`,
             href: "/extranet/reservations",
           }),
         }))
+
+        return { ok: true, data: updated }
       },
 
       setBookingStatus: (id, status) =>
@@ -357,6 +434,7 @@ export const useStore = create<Store>()(
           id: `rev-${Math.random().toString(36).slice(2, 9)}`,
           hotelId: input.hotelId,
           bookingId: input.bookingId,
+          authorId: profile.id,
           author: `${profile.firstName} ${profile.lastName}`,
           authorSeed: profile.avatarSeed,
           country: profile.country,
@@ -395,7 +473,7 @@ export const useStore = create<Store>()(
         // Only the review's own author hears about the reply. Notifying
         // unconditionally told the signed-in customer that a hotel had answered
         // a review written by somebody else.
-        if (review.authorSeed !== get().profile.avatarSeed) return
+        if (review.authorId !== get().profile.id) return
         set((state) => ({
           notifications: pushNotification(state, {
             audience: "customer",

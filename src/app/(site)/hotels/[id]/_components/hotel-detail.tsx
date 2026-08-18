@@ -6,7 +6,6 @@ import {
   Baby,
   Ban,
   BedDouble,
-  Check,
   Cigarette,
   Clock,
   CreditCard,
@@ -34,22 +33,12 @@ import { Separator } from "@/components/ui/separator"
 import { StarRating } from "@/components/marketplace/star-rating"
 import { HotelCard } from "@/components/marketplace/hotel-card"
 import { DiscountBadge } from "@/components/marketplace/discount-badge"
+import { AmenityIcon } from "@/components/marketplace/amenity-icon"
 import { NotFoundCard } from "@/components/shared/not-found-card"
 import { HotelGallery } from "./hotel-gallery"
 import { HotelReviews } from "./hotel-reviews"
 import { ReserveCard } from "./reserve-card"
-
-const amenityChips: Record<string, string> = {
-  Breakfast: "🍳",
-  Pool: "🏊",
-  Spa: "💆",
-  Parking: "🅿",
-  WiFi: "📶",
-  Gym: "🏋",
-  Restaurant: "🍽",
-  Bar: "🍸",
-  Beach: "🏖",
-}
+import { MobileReserveBar } from "./mobile-reserve-bar"
 
 export function HotelDetail({ id }: { id: string }) {
   const hotel = useHotel(id)
@@ -71,6 +60,7 @@ export function HotelDetail({ id }: { id: string }) {
   }
 
   const selectedRoomId = roomId ?? hotel.rooms[0]?.id
+  const selectedRoom = hotel.rooms.find((r) => r.id === selectedRoomId)
   const visibleAmenities = hotel.amenities.slice(0, 5)
   const moreCount = hotel.amenities.length - visibleAmenities.length
   const similar = hotels.filter((h) => h.id !== hotel.id && h.city !== hotel.city).slice(0, 3)
@@ -89,7 +79,8 @@ export function HotelDetail({ id }: { id: string }) {
   ]
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    // pb-28 keeps the last section clear of the mobile reserve bar
+    <div className="mx-auto max-w-7xl px-4 py-6 pb-28 sm:px-6 lg:px-8 lg:py-8 lg:pb-8">
       {/* BREADCRUMB */}
       <Breadcrumb>
         <BreadcrumbList>
@@ -146,15 +137,17 @@ export function HotelDetail({ id }: { id: string }) {
             <span className="text-muted-foreground flex items-center gap-1.5">
               <MapPin className="size-4" />
               {hotel.city}, {hotel.country}
+              {/* Labelled for what it actually does — the target is the address
+                  block, not a map. The real map is the "Open in Maps" link. */}
               <Link href="#location" className="text-primary hover:underline">
-                View on Map
+                View location
               </Link>
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
             {visibleAmenities.map((a) => (
-              <Badge key={a} variant="outline" className="gap-1">
-                <span aria-hidden>{amenityChips[a] ?? "✨"}</span>
+              <Badge key={a} variant="outline" className="gap-1.5">
+                <AmenityIcon amenity={a} className="size-3" />
                 {a}
               </Badge>
             ))}
@@ -252,8 +245,8 @@ export function HotelDetail({ id }: { id: string }) {
             <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
               {hotel.amenities.map((a) => (
                 <div key={a} className="flex items-center gap-2 text-sm">
-                  <span className="bg-primary/10 text-primary flex size-5 shrink-0 items-center justify-center rounded-full">
-                    <Check className="size-3" />
+                  <span className="bg-primary/10 text-primary flex size-7 shrink-0 items-center justify-center rounded-full">
+                    <AmenityIcon amenity={a} className="size-3.5" />
                   </span>
                   {a}
                 </div>
@@ -346,6 +339,8 @@ export function HotelDetail({ id }: { id: string }) {
           </div>
         </section>
       ) : null}
+
+      <MobileReserveBar room={selectedRoom} />
     </div>
   )
 }

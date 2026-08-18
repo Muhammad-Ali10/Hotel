@@ -12,7 +12,7 @@ import { WizardShell, StepHeading } from "../_components/wizard-shell"
 import { TipPanel } from "../_components/tip-panel"
 import { StepNav } from "../_components/step-nav"
 import { useWizard } from "../_components/wizard-provider"
-import { pkr } from "../_lib/labels"
+import { money } from "../_lib/labels"
 
 type Season = { id: string; name: string; adjustment: number }
 
@@ -57,13 +57,13 @@ export default function PricingPage() {
         </Label>
         <div className="flex items-stretch gap-2">
           <span className="bg-muted text-muted-foreground flex items-center rounded-lg border px-3 text-sm font-medium">
-            Rs
+            $
           </span>
           <Input
             id="baseRate"
             type="number"
             inputMode="numeric"
-            placeholder="e.g. 8000"
+            placeholder="e.g. 550"
             value={baseRate}
             onChange={(e) => setBaseRate(e.target.value)}
             className="flex-1"
@@ -87,7 +87,7 @@ export default function PricingPage() {
         </div>
         {weekend && (
           <div className="mt-3 border-t pt-3">
-            <p className="text-sm font-medium">Weekend rate: {pkr(weekendRate)}</p>
+            <p className="text-sm font-medium">Weekend rate: {money(weekendRate)}</p>
             <p className="text-muted-foreground text-xs">
               {data.weekendMarkup}% markup · applied Friday &amp; Saturday
             </p>

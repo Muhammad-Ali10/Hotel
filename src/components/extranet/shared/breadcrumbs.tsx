@@ -4,9 +4,16 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { cn } from "@/lib/utils"
-import { nav } from "@/components/extranet/layout/sidebar"
+import { nav as extranetNav } from "@/components/extranet/layout/sidebar"
 
 type Crumb = { label: string; href?: string }
+
+/** The minimum a nav tree must expose to build a trail. */
+type CrumbNavItem = {
+  title: string
+  href: string
+  children?: { title: string; href: string }[]
+}
 
 /** True when `href` is `pathname` or one of its ancestor segments. */
 function matches(pathname: string, href: string) {
@@ -14,17 +21,22 @@ function matches(pathname: string, href: string) {
 }
 
 /**
- * Builds the "Dashboard / Section / Page" trail for the current extranet route
- * from the shared sidebar `nav` structure, mirroring the Figma breadcrumb.
+ * Builds the "Dashboard / Section / Page" trail for the current route from a
+ * sidebar `nav` structure, mirroring the Figma breadcrumb. Shared by the
+ * extranet and the admin panel — each passes its own nav and root.
  */
-function trailFor(pathname: string): Crumb[] {
-  if (pathname === "/extranet") return []
+function trailFor(
+  pathname: string,
+  nav: CrumbNavItem[],
+  root: string
+): Crumb[] {
+  if (pathname === root) return []
 
-  const crumbs: Crumb[] = [{ label: "Dashboard", href: "/extranet" }]
+  const crumbs: Crumb[] = [{ label: "Dashboard", href: root }]
 
   // Longest-matching top-level section (skip the Dashboard root).
   const section = nav
-    .filter((n) => n.href !== "/extranet" && matches(pathname, n.href))
+    .filter((n) => n.href !== root && matches(pathname, n.href))
     .sort((a, b) => b.href.length - a.href.length)[0]
 
   if (!section) return crumbs
@@ -52,9 +64,18 @@ function leafLabel(pathname: string) {
     .join(" ")
 }
 
-export function Breadcrumbs({ className }: { className?: string }) {
+export function Breadcrumbs({
+  className,
+  nav = extranetNav,
+  root = "/extranet",
+}: {
+  className?: string
+  /** Defaults to the extranet nav; the admin passes its own tree. */
+  nav?: CrumbNavItem[]
+  root?: string
+}) {
   const pathname = usePathname()
-  const crumbs = trailFor(pathname)
+  const crumbs = trailFor(pathname, nav, root)
   if (crumbs.length === 0) return null
 
   return (

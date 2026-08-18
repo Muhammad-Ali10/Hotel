@@ -21,10 +21,23 @@
       "Bash(curl -s \"http://localhost:3411/\")",
       "Bash(curl -s \"http://localhost:3411/join/property-type\")",
       "Bash(curl -s \"http://localhost:3411/join/amenities\")",
-      "Bash(pkill -f \"next start -p 3411\")"
+      "Bash(pkill -f \"next start -p 3411\")",
+      "Bash(gh pr *)",
+      "PowerShell($c = Get-Command gh -ErrorAction SilentlyContinue; if \\($c\\) { $c.Source } else { \"gh not installed\" }; git remote -v)",
+      "PowerShell($c = Get-Command gh -ErrorAction SilentlyContinue; if \\($c\\) { \"gh found: \" + $c.Source; gh pr list } else { \"gh still not installed\" })",
+      "Skill(code-review:code-review)",
+      "Skill(code-review:code-review:*)",
+      "Bash(git diff *)",
+      "Bash(grep -rnE \"#[0-9a-fA-F]{3,8}\" src/data/admin src/lib/admin)",
+      "Bash(curl -s -o /dev/null http://localhost:3000/api/verify-temp)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/verify-temp)",
+      "Bash(echo \"started, pid $!\")",
+      "Bash(curl -s -o /dev/null http://localhost:3000/)",
+      "Bash(echo \"=== exit: $? ===\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\Muhammad Ali\\.claude\\projects\\E--Hotel\\memory"
+      "C:\\Users\\Muhammad Ali\\.claude\\projects\\E--Hotel\\memory",
+      "\\tmp"
     ]
   }
 }

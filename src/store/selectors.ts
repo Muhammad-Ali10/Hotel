@@ -64,11 +64,8 @@ export function usePartnerReviews() {
 /** Reviews written by the signed-in customer. */
 export function useMyReviews() {
   const reviews = useStore((s) => s.reviews)
-  const profile = useStore((s) => s.profile)
-  return useMemo(
-    () => reviews.filter((r) => r.authorSeed === profile.avatarSeed),
-    [reviews, profile.avatarSeed]
-  )
+  const userId = useStore((s) => s.profile.id)
+  return useMemo(() => reviews.filter((r) => r.authorId === userId), [reviews, userId])
 }
 
 /** Headline rating + review count + category averages, always derived. */
@@ -101,16 +98,22 @@ export function useBooking(id: string) {
   return useMemo(() => bookings.find((b) => b.id === id), [bookings, id])
 }
 
-/** The signed-in customer's bookings, newest stay first. */
+/**
+ * The signed-in customer's bookings, newest stay first.
+ *
+ * Keyed on `customerId`, not on the guest email. Checkout lets the guest edit
+ * the contact email — booking for a colleague, correcting a typo — and matching
+ * on it dropped the booking out of their own dashboard the moment they did.
+ */
 export function useMyBookings() {
   const bookings = useStore((s) => s.bookings)
-  const email = useStore((s) => s.profile.email)
+  const userId = useStore((s) => s.profile.id)
   return useMemo(
     () =>
       bookings
-        .filter((b) => b.guest.email === email)
+        .filter((b) => b.customerId === userId)
         .sort((a, b) => (a.checkIn < b.checkIn ? 1 : -1)),
-    [bookings, email]
+    [bookings, userId]
   )
 }
 

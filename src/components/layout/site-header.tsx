@@ -118,19 +118,25 @@ export function SiteHeader() {
       {/* Category tabs row */}
       <div className="border-t">
         <div className="mx-auto flex max-w-7xl items-center gap-1 overflow-x-auto px-4 sm:px-6 lg:px-8">
+          {/* Only Stays is built. The rest used to look identical and do
+              nothing at all when clicked — now they read as unavailable. */}
           {siteConfig.categories.map((cat) => (
             <button
               key={cat.label}
               type="button"
+              disabled={!cat.active}
+              aria-current={cat.active ? "page" : undefined}
+              title={cat.active ? undefined : `${cat.label} — coming soon`}
               className={cn(
                 "flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm whitespace-nowrap transition-colors",
                 cat.active
                   ? "border-primary text-foreground font-medium"
-                  : "text-muted-foreground hover:text-foreground border-transparent"
+                  : "text-muted-foreground/60 border-transparent cursor-not-allowed"
               )}
             >
               <span aria-hidden>{cat.icon}</span>
               {cat.label}
+              {!cat.active ? <span className="sr-only">(coming soon)</span> : null}
             </button>
           ))}
         </div>

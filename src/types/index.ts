@@ -160,6 +160,8 @@ export type Review = {
   hotelId: string
   /** set when the review came from a real stay → renders the Verified badge */
   bookingId?: string
+  /** account that wrote it — undefined for imported/OTA reviews. */
+  authorId?: string
   author: string
   authorSeed: string
   country: string
@@ -238,6 +240,13 @@ export type PaymentStatus = "paid" | "pending"
 export type Booking = {
   /** STY-XXXXXX — the only booking id scheme in the product */
   id: string
+  /**
+   * The account the booking belongs to. Undefined for bookings that arrived
+   * through an OTA or a guest checkout — those have a `guest` block but no
+   * platform account behind it. Ownership is NEVER inferred from the email:
+   * the guest can edit that field at checkout.
+   */
+  customerId?: string
   hotelId: string
   roomId: string
   /** snapshots taken at booking time so history survives catalog edits */
@@ -322,6 +331,8 @@ export type SupportTicket = {
 /* --------------------------------------------------------------- profile -- */
 
 export type UserProfile = {
+  /** Stable account id — what a booking, review or favourite is keyed to. */
+  id: string
   firstName: string
   lastName: string
   email: string

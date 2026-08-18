@@ -15,7 +15,7 @@ import { TipPanel } from "../../_components/tip-panel"
 import { useWizard } from "../../_components/wizard-provider"
 import { href, nextStep, prevStep } from "../../_lib/steps"
 import { newUnit } from "../../_lib/types"
-import { pkr } from "../../_lib/labels"
+import { money } from "../../_lib/labels"
 
 export default function RatePlanPage() {
   const router = useRouter()
@@ -101,15 +101,15 @@ export default function RatePlanPage() {
             <div className="divide-y text-sm">
               <div className="flex justify-between py-2">
                 <span className="text-muted-foreground">Base price</span>
-                <span className="font-medium">{pkr(base)}</span>
+                <span className="font-medium">{money(base)}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-muted-foreground">Discount ({discount}%)</span>
-                <span className="font-medium">−{pkr(off)}</span>
+                <span className="font-medium">−{money(off)}</span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="font-medium">Non-refundable price</span>
-                <span className="font-semibold">{pkr(nonRefundable)}</span>
+                <span className="font-semibold">{money(nonRefundable)}</span>
               </div>
             </div>
             {discount >= 10 && (

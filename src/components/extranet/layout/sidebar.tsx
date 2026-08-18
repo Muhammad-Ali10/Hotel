@@ -1,6 +1,5 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -17,21 +16,11 @@ import {
   Tag,
   TrendingUp,
   Wallet,
-  type LucideIcon,
 } from "lucide-react"
 
-import { cn } from "@/lib/utils"
+import { AppSidebar, type AppNavEntry } from "@/components/shared/app-sidebar"
 
-type NavChild = { title: string; href: string }
-type NavItem = {
-  title: string
-  href: string
-  icon: LucideIcon
-  badge?: number
-  children?: NavChild[]
-}
-
-export const nav: NavItem[] = [
+export const nav: AppNavEntry[] = [
   { title: "Dashboard", href: "/extranet", icon: LayoutDashboard },
   {
     title: "Reservations",
@@ -159,189 +148,44 @@ export const nav: NavItem[] = [
   },
 ]
 
-function isActive(pathname: string, href: string) {
-  if (href === "/extranet") return pathname === "/extranet"
-  return pathname === href || pathname.startsWith(href + "/")
-}
-
 export function ExtranetSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Brand / property group */}
-      <Link
-        href="/extranet"
-        onClick={onNavigate}
-        className="flex items-center gap-3 border-b p-4"
-      >
-        <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Hotel className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="font-heading truncate text-sm font-semibold">
-            Aurora Hospitality
-          </p>
-          <p className="text-muted-foreground text-xs">5 properties</p>
-        </div>
-      </Link>
-
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {nav.map((item) =>
-          item.children ? (
-            <NavGroup
-              key={item.title}
-              item={item}
-              pathname={pathname}
-              onNavigate={onNavigate}
-            />
-          ) : (
-            <NavRow
-              key={item.title}
-              href={item.href}
-              icon={item.icon}
-              title={item.title}
-              badge={item.badge}
-              active={isActive(pathname, item.href)}
-              onNavigate={onNavigate}
-            />
-          )
-        )}
-      </nav>
-
-      <div className="border-t p-3">
+    <AppSidebar
+      nav={nav}
+      root="/extranet"
+      pathname={pathname}
+      onNavigate={onNavigate}
+      brand={
         <Link
-          href="/"
+          href="/extranet"
           onClick={onNavigate}
-          className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+          className="flex items-center gap-3 border-b p-4"
         >
-          <ChevronRight className="size-4 rotate-180" />
-          Back to Stayora
+          <span className="bg-primary text-primary-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+            <Hotel className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="font-heading truncate text-sm font-semibold">
+              Aurora Hospitality
+            </p>
+            <p className="text-muted-foreground text-xs">5 properties</p>
+          </div>
         </Link>
-      </div>
-    </div>
-  )
-}
-
-function NavRow({
-  href,
-  icon: Icon,
-  title,
-  badge,
-  active,
-  onNavigate,
-}: {
-  href: string
-  icon: LucideIcon
-  title: string
-  badge?: number
-  active: boolean
-  onNavigate?: () => void
-}) {
-  return (
-    <Link
-      href={href}
-      onClick={onNavigate}
-      className={cn(
-        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-        active
-          ? "bg-primary text-primary-foreground font-medium"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-      )}
-    >
-      <Icon className="size-4 shrink-0" />
-      <span className="flex-1 truncate">{title}</span>
-      {badge ? (
-        <span
-          className={cn(
-            "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs",
-            active
-              ? "bg-primary-foreground text-primary"
-              : "bg-muted text-muted-foreground"
-          )}
-        >
-          {badge}
-        </span>
-      ) : null}
-    </Link>
-  )
-}
-
-function NavGroup({
-  item,
-  pathname,
-  onNavigate,
-}: {
-  item: NavItem
-  pathname: string
-  onNavigate?: () => void
-}) {
-  const sectionActive = isActive(pathname, item.href)
-  const [open, setOpen] = React.useState(false)
-  // The active section is always expanded; others follow the manual toggle.
-  const expanded = sectionActive || open
-  const Icon = item.icon
-
-  return (
-    <div>
-      <div
-        className={cn(
-          "flex items-center gap-3 rounded-lg pr-2 pl-3 text-sm transition-colors",
-          sectionActive
-            ? "text-foreground font-medium"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-        )}
-      >
-        <Link
-          href={item.href}
-          onClick={onNavigate}
-          className="flex flex-1 items-center gap-3 py-2"
-        >
-          <Icon className="size-4 shrink-0" />
-          <span className="flex-1 truncate">{item.title}</span>
-          {item.badge ? (
-            <span className="bg-muted text-muted-foreground flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs">
-              {item.badge}
-            </span>
-          ) : null}
-        </Link>
-        <button
-          type="button"
-          aria-label={`Toggle ${item.title}`}
-          aria-expanded={expanded}
-          onClick={() => setOpen((v) => !v)}
-          className="hover:bg-muted shrink-0 rounded-md p-1"
-        >
-          <ChevronRight
-            className={cn(
-              "size-4 transition-transform",
-              expanded && "rotate-90"
-            )}
-          />
-        </button>
-      </div>
-      {expanded ? (
-        <div className="mt-1 ml-5 space-y-1 border-l pl-3">
-          {item.children!.map((child) => {
-            const active = pathname === child.href
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                onClick={onNavigate}
-                className={cn(
-                  "block rounded-lg px-3 py-1.5 text-sm transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground font-medium"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                {child.title}
-              </Link>
-            )
-          })}
+      }
+      footer={
+        <div className="border-t p-3">
+          <Link
+            href="/"
+            onClick={onNavigate}
+            className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+          >
+            <ChevronRight className="size-4 rotate-180" />
+            Back to Stayora
+          </Link>
         </div>
-      ) : null}
-    </div>
+      }
+    />
   )
 }

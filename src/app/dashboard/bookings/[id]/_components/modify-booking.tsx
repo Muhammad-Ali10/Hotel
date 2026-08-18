@@ -9,7 +9,7 @@ import { toast } from "sonner"
 
 import { placeholderImage } from "@/lib/images"
 import { formatCurrency, formatDate } from "@/lib/format"
-import { checkStay, priceBooking } from "@/lib/domain"
+import { checkAvailability, priceBooking } from "@/lib/domain"
 import { useStore } from "@/store"
 import { useBooking, useHotel } from "@/store/selectors"
 import { Button } from "@/components/ui/button"
@@ -28,16 +28,20 @@ import {
 import { StatusBadge } from "@/components/shared/status-badge"
 import { NotFoundCard } from "@/components/shared/not-found-card"
 
-const guestItems = [1, 2, 3, 4, 5, 6].map((n) => ({
-  value: String(n),
-  label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
-}))
+/** Party sizes the room can actually sleep — `Room.guests` was display-only. */
+function guestOptions(max: number) {
+  return Array.from({ length: Math.max(max, 1) }, (_, i) => i + 1).map((n) => ({
+    value: String(n),
+    label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
+  }))
+}
 
 export function ModifyBooking({ id }: { id: string }) {
   const router = useRouter()
   const booking = useBooking(id)
   const hotel = useHotel(booking?.hotelId ?? "")
   const modifyBooking = useStore((s) => s.modifyBooking)
+  const bookings = useStore((s) => s.bookings)
 
   const [checkIn, setCheckIn] = React.useState(booking?.checkIn ?? "")
   const [checkOut, setCheckOut] = React.useState(booking?.checkOut ?? "")
@@ -67,7 +71,20 @@ export function ModifyBooking({ id }: { id: string }) {
   }
 
   const room = hotel.rooms.find((r) => r.id === booking.roomId)
-  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  const guestChoices = guestOptions(room?.guests ?? booking.guests)
+  // Excludes this reservation from the inventory count — it already holds its
+  // own room, so it must not be allowed to block itself.
+  const stay = room
+    ? checkAvailability({
+        hotel,
+        room,
+        checkIn,
+        checkOut,
+        guests: Number(guests),
+        bookings,
+        ignoreBookingId: booking.id,
+      })
+    : ({ ok: false, reason: "invalid", message: "That room is no longer offered." } as const)
   const validDates = stay.ok
 
   // Re-priced with the same function that quoted the original booking, so the
@@ -101,12 +118,16 @@ export function ModifyBooking({ id }: { id: string }) {
       toast.info("No changes to save.")
       return
     }
-    modifyBooking(id, {
+    const result = modifyBooking(id, {
       checkIn,
       checkOut,
       guests: Number(guests),
       specialRequests: requests.trim(),
     })
+    if (!result.ok) {
+      toast.error("We couldn't save that change", { description: result.message })
+      return
+    }
     toast.success(`Your booking at ${booking!.hotelName} has been updated.`)
     router.push("/dashboard/bookings")
   }
@@ -209,7 +230,7 @@ export function ModifyBooking({ id }: { id: string }) {
               <div className="space-y-1.5">
                 <Label>Guests</Label>
                 <Select
-                  items={guestItems}
+                  items={guestChoices}
                   value={guests}
                   onValueChange={(v) => setGuests(v as string)}
                 >
@@ -218,7 +239,7 @@ export function ModifyBooking({ id }: { id: string }) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {guestItems.map((o) => (
+                    {guestChoices.map((o) => (
                       <SelectItem key={o.value} value={o.value}>
                         {o.label}
                       </SelectItem>

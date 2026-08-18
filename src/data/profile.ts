@@ -6,6 +6,7 @@ import type { UserProfile, UserSettings } from "@/types"
  * previously each surface had its own idea of who the user was.
  */
 export const userProfile: UserProfile = {
+  id: "usr-john-doe",
   firstName: "John",
   lastName: "Doe",
   email: "john.doe@example.com",

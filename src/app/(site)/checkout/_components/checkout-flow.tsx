@@ -2,12 +2,17 @@
 
 import * as React from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useForm, useWatch, Controller, type FieldPath } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Building2,
+  ChevronDown,
   ClipboardCheck,
   CreditCard,
   Gift,
@@ -18,10 +23,10 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import type { BookingAddOn } from "@/types"
+import type { BookingAddOn, Hotel, Room } from "@/types"
 import { formatCurrency, formatDate } from "@/lib/format"
 import {
-  checkStay,
+  checkAvailability,
   formatTime24,
   nightsBetween,
   priceBooking,
@@ -59,6 +64,94 @@ const steps = [
 
 const arrivalItems = arrivalTimeSlots.map((slot) => ({ value: slot, label: slot }))
 
+/**
+ * Every rule the guest has to satisfy, in one place. Validation used to be an
+ * `if` chain that fired a toast and moved on — nothing marked the offending
+ * field, so a guest with a typo in their email had to guess which box was
+ * wrong before the toast faded.
+ */
+const checkoutSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "Enter your first name"),
+    lastName: z.string().trim().min(1, "Enter your last name"),
+    email: z.email("Enter a valid email address, e.g. you@example.com"),
+    phone: z
+      .string()
+      .trim()
+      .min(6, "Enter a number the property can reach you on"),
+    country: z.string().trim().min(1, "Enter your country or region"),
+    arrivalTime: z.string().min(1, "Choose an estimated arrival time"),
+    specialRequests: z.string().max(500, "Keep requests under 500 characters"),
+    payMethod: z.enum(["card", "property"]),
+    cardName: z.string(),
+    cardNumber: z.string(),
+    cardExpiry: z.string(),
+    cardCvv: z.string(),
+    agree: z.literal(true, {
+      error: "Accept the terms and cancellation policy to confirm",
+    }),
+  })
+  .superRefine((data, ctx) => {
+    // Card details only matter when the guest is paying now.
+    if (data.payMethod !== "card") return
+
+    if (data.cardName.trim().length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cardName"],
+        message: "Enter the name printed on the card",
+      })
+    }
+    const digits = data.cardNumber.replace(/\s/g, "")
+    if (!/^\d{13,19}$/.test(digits)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cardNumber"],
+        message: "Enter a valid card number",
+      })
+    }
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(data.cardExpiry)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cardExpiry"],
+        message: "Use MM/YY",
+      })
+    }
+    if (!/^\d{3,4}$/.test(data.cardCvv)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cardCvv"],
+        message: "3 or 4 digits",
+      })
+    }
+  })
+
+type CheckoutValues = z.input<typeof checkoutSchema>
+
+/** Which fields each step is responsible for, so Continue only validates what
+ *  the guest can actually see. */
+const stepFields: Record<number, FieldPath<CheckoutValues>[]> = {
+  1: ["firstName", "lastName", "email", "phone", "country", "arrivalTime", "specialRequests"],
+  2: [],
+  3: ["payMethod", "cardName", "cardNumber", "cardExpiry", "cardCvv"],
+  4: ["agree"],
+}
+
+/** 4242424242424242 → 4242 4242 4242 4242 */
+function formatCardNumber(value: string) {
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 19)
+    .replace(/(.{4})/g, "$1 ")
+    .trim()
+}
+
+/** 1226 → 12/26 */
+function formatExpiry(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 4)
+  return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits
+}
+
 export function CheckoutFlow({
   hotelId,
   roomId,
@@ -76,27 +169,47 @@ export function CheckoutFlow({
   const hotel = useHotel(hotelId)
   const profile = useProfile()
   const createBooking = useStore((s) => s.createBooking)
+  const bookings = useStore((s) => s.bookings)
 
   const [step, setStep] = React.useState(1)
   const [addOnIds, setAddOnIds] = React.useState<string[]>([])
-  // Prefilled from the signed-in profile — the form used to start blank even
-  // though we knew exactly who was booking.
-  const [form, setForm] = React.useState({
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    email: profile.email,
-    phone: profile.phone,
-    country: profile.country,
-    arrivalTime: arrivalTimeSlots[0],
-    specialRequests: "",
-    payMethod: "card" as "card" | "property",
-    cardName: "",
-    cardNumber: "",
-    cardExpiry: "",
-    cardCvv: "",
-    agree: false,
+  // Confirm writes synchronously, so a double-click used to land two
+  // reservations — and two charges — before the route change happened.
+  const [submitting, setSubmitting] = React.useState(false)
+
+  const {
+    register,
+    control,
+    handleSubmit,
+    trigger,
+    getValues,
+    formState: { errors },
+  } = useForm<CheckoutValues>({
+    resolver: zodResolver(checkoutSchema),
+    mode: "onBlur",
+    reValidateMode: "onChange",
+    // Prefilled from the signed-in profile — the form used to start blank even
+    // though we knew exactly who was booking.
+    defaultValues: {
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      email: profile.email,
+      phone: profile.phone,
+      country: profile.country,
+      arrivalTime: arrivalTimeSlots[0],
+      specialRequests: "",
+      payMethod: "card",
+      cardName: "",
+      cardNumber: "",
+      cardExpiry: "",
+      cardCvv: "",
+      agree: false as unknown as true,
+    },
   })
-  const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }))
+
+  // useWatch rather than watch() — the latter returns an unmemoizable function
+  // and makes the React Compiler skip this whole component.
+  const payMethod = useWatch({ control, name: "payMethod" })
 
   if (!hotel) {
     return (
@@ -110,7 +223,14 @@ export function CheckoutFlow({
   }
 
   const room = hotel.rooms.find((r) => r.id === roomId) ?? hotel.rooms[0]
-  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  const stay = checkAvailability({
+    hotel,
+    room,
+    checkIn,
+    checkOut,
+    guests,
+    bookings,
+  })
 
   const nights = nightsBetween(checkIn, checkOut)
   const availableAddOns = hotel.valueAdds.filter((v) => v.active)
@@ -127,30 +247,13 @@ export function CheckoutFlow({
   // One pricing function for the whole product — the reserve card quoted from
   // it, the confirmation prints it, and the extranet invoices reconcile to it.
   const pricing = priceBooking({ hotel, room, checkIn, checkOut, guests, addOns })
-  const nightLabel = pricing.nights === 1 ? "night" : "nights"
 
-  function validate(current: number) {
-    if (current === 1) {
-      if (!form.firstName || !form.lastName || !/\S+@\S+\.\S+/.test(form.email)) {
-        toast.error("Please enter your name and a valid email.")
-        return false
-      }
-      if (!form.phone.trim()) {
-        toast.error("Please enter a phone number so the property can reach you.")
-        return false
-      }
+  async function next() {
+    const valid = await trigger(stepFields[step])
+    if (!valid) {
+      toast.error("Check the highlighted fields")
+      return
     }
-    if (current === 3 && form.payMethod === "card") {
-      if (!form.cardName || !form.cardNumber || !form.cardExpiry || !form.cardCvv) {
-        toast.error("Please complete your card details.")
-        return false
-      }
-    }
-    return true
-  }
-
-  function next() {
-    if (!validate(step)) return
     setStep((s) => Math.min(steps.length, s + 1))
     window.scrollTo({ top: 0, behavior: "smooth" })
   }
@@ -159,46 +262,67 @@ export function CheckoutFlow({
     setStep((s) => Math.max(1, s - 1))
   }
 
-  function confirm() {
-    if (!form.agree) {
-      toast.error("Please accept the terms & conditions to continue.")
-      return
-    }
+  function confirm(values: CheckoutValues) {
+    if (submitting) return
     if (!stay.ok) {
       toast.error(stay.message)
       return
     }
+    setSubmitting(true)
 
     // The booking is written to the store here. It is the same record the
     // dashboard lists and the partner sees in the extranet — checkout used to
     // just build a query string and forget everything else.
-    const booking = createBooking({
+    const result = createBooking({
       hotelId: hotel!.id,
       roomId: room.id,
+      // The stay belongs to whoever is signed in, whatever contact email they
+      // put on the form — they may well be booking it for somebody else.
+      customerId: profile.id,
       guest: {
-        firstName: form.firstName,
-        lastName: form.lastName,
-        email: form.email,
-        phone: form.phone,
-        country: form.country,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: values.phone,
+        country: values.country,
       },
       checkIn,
       checkOut,
       guests,
-      arrivalTime: form.arrivalTime,
-      specialRequests: form.specialRequests,
+      arrivalTime: values.arrivalTime,
+      specialRequests: values.specialRequests,
       addOns,
       payment: {
-        method: form.payMethod,
-        status: form.payMethod === "card" ? "paid" : "pending",
+        method: values.payMethod,
+        status: values.payMethod === "card" ? "paid" : "pending",
       },
     })
 
-    router.push(`/checkout/confirmation?ref=${booking.id}`)
+    // The write revalidates availability itself — someone else can take the
+    // last room while this guest is filling in their card details.
+    if (!result.ok) {
+      setSubmitting(false)
+      toast.error("We couldn't confirm that booking", { description: result.message })
+      return
+    }
+
+    router.push(`/checkout/confirmation?ref=${result.data.id}`)
   }
 
+  const summary = (
+    <PriceSummary
+      hotel={hotel}
+      room={room}
+      checkIn={checkIn}
+      checkOut={checkOut}
+      guests={guests}
+      addOns={addOns}
+      pricing={pricing}
+    />
+  )
+
   return (
-    <div>
+    <form onSubmit={handleSubmit(confirm)} noValidate>
       {/* STEPPER */}
       <ol className="flex items-center">
         {steps.map((s, i) => (
@@ -211,6 +335,7 @@ export function CheckoutFlow({
                     ? "bg-primary text-primary-foreground border-transparent"
                     : "text-muted-foreground"
                 )}
+                aria-current={step === s.n ? "step" : undefined}
               >
                 {s.n}
               </span>
@@ -242,6 +367,12 @@ export function CheckoutFlow({
         </div>
       ) : null}
 
+      {/* MOBILE TOTAL — the summary card is desktop-only, so on a phone the
+          guest used to type card details with the price entirely off-screen. */}
+      <MobileTotal total={pricing.total} nights={pricing.nights}>
+        {summary}
+      </MobileTotal>
+
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_360px]">
         {/* LEFT — the steps */}
         <div className="min-w-0">
@@ -250,44 +381,49 @@ export function CheckoutFlow({
               <CardContent className="space-y-5">
                 <h2 className="font-heading text-lg font-semibold">Your Details</h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="First name" htmlFor="first-name">
+                  <Field label="First name" htmlFor="first-name" error={errors.firstName?.message}>
                     <Input
                       id="first-name"
-                      value={form.firstName}
-                      onChange={(e) => set({ firstName: e.target.value })}
+                      autoComplete="given-name"
+                      aria-invalid={!!errors.firstName}
+                      {...register("firstName")}
                     />
                   </Field>
-                  <Field label="Last name" htmlFor="last-name">
+                  <Field label="Last name" htmlFor="last-name" error={errors.lastName?.message}>
                     <Input
                       id="last-name"
-                      value={form.lastName}
-                      onChange={(e) => set({ lastName: e.target.value })}
+                      autoComplete="family-name"
+                      aria-invalid={!!errors.lastName}
+                      {...register("lastName")}
                     />
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field label="Email" htmlFor="email">
+                  <Field label="Email" htmlFor="email" error={errors.email?.message}>
                     <Input
                       id="email"
                       type="email"
-                      value={form.email}
-                      onChange={(e) => set({ email: e.target.value })}
+                      autoComplete="email"
+                      aria-invalid={!!errors.email}
+                      {...register("email")}
                     />
                   </Field>
-                  <Field label="Phone" htmlFor="phone">
+                  <Field label="Phone" htmlFor="phone" error={errors.phone?.message}>
                     <Input
                       id="phone"
                       type="tel"
-                      value={form.phone}
-                      onChange={(e) => set({ phone: e.target.value })}
+                      autoComplete="tel"
+                      aria-invalid={!!errors.phone}
+                      {...register("phone")}
                     />
                   </Field>
                 </div>
-                <Field label="Country / Region" htmlFor="country">
+                <Field label="Country / Region" htmlFor="country" error={errors.country?.message}>
                   <Input
                     id="country"
-                    value={form.country}
-                    onChange={(e) => set({ country: e.target.value })}
+                    autoComplete="country-name"
+                    aria-invalid={!!errors.country}
+                    {...register("country")}
                   />
                 </Field>
 
@@ -296,32 +432,43 @@ export function CheckoutFlow({
                     never actually collected. */}
                 <Field
                   label={`Estimated arrival (check-in from ${formatTime24(hotel.policies.checkInTime)})`}
+                  error={errors.arrivalTime?.message}
                 >
-                  <Select
-                    items={arrivalItems}
-                    value={form.arrivalTime}
-                    onValueChange={(v) => set({ arrivalTime: v as string })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {arrivalItems.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Controller
+                    control={control}
+                    name="arrivalTime"
+                    render={({ field }) => (
+                      <Select
+                        items={arrivalItems}
+                        value={field.value}
+                        onValueChange={(v) => field.onChange(v as string)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {arrivalItems.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </Field>
 
-                <Field label="Special requests (optional)" htmlFor="requests">
+                <Field
+                  label="Special requests (optional)"
+                  htmlFor="requests"
+                  error={errors.specialRequests?.message}
+                >
                   <Textarea
                     id="requests"
                     rows={3}
-                    value={form.specialRequests}
-                    onChange={(e) => set({ specialRequests: e.target.value })}
+                    aria-invalid={!!errors.specialRequests}
                     placeholder="Room preference, celebrating something, dietary needs…"
+                    {...register("specialRequests")}
                   />
                 </Field>
               </CardContent>
@@ -380,141 +527,173 @@ export function CheckoutFlow({
             <Card>
               <CardContent className="space-y-5">
                 <h2 className="font-heading text-lg font-semibold">Payment</h2>
-                <RadioGroup
-                  value={form.payMethod}
-                  onValueChange={(v) => set({ payMethod: v as "card" | "property" })}
-                  className="gap-2"
-                >
-                  <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
-                    <RadioGroupItem value="card" />
-                    <CreditCard className="size-4" />
-                    Pay now by card
-                  </label>
-                  <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
-                    <RadioGroupItem value="property" />
-                    <Building2 className="size-4" />
-                    Pay at the property
-                  </label>
-                </RadioGroup>
+                <Controller
+                  control={control}
+                  name="payMethod"
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={(v) => field.onChange(v as "card" | "property")}
+                      className="gap-2"
+                    >
+                      <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
+                        <RadioGroupItem value="card" />
+                        <CreditCard className="size-4" />
+                        Pay now by card
+                      </label>
+                      <label className="hover:bg-accent/50 flex cursor-pointer items-center gap-2.5 rounded-lg border p-3 text-sm transition-colors">
+                        <RadioGroupItem value="property" />
+                        <Building2 className="size-4" />
+                        Pay at the property
+                      </label>
+                    </RadioGroup>
+                  )}
+                />
 
-                {form.payMethod === "card" ? (
+                {payMethod === "card" ? (
                   <div className="space-y-4">
-                    <Field label="Name on card" htmlFor="card-name">
+                    <Field label="Name on card" htmlFor="card-name" error={errors.cardName?.message}>
                       <Input
                         id="card-name"
-                        value={form.cardName}
-                        onChange={(e) => set({ cardName: e.target.value })}
+                        autoComplete="cc-name"
+                        aria-invalid={!!errors.cardName}
+                        {...register("cardName")}
                       />
                     </Field>
-                    <Field label="Card number" htmlFor="card-number">
+                    <Field
+                      label="Card number"
+                      htmlFor="card-number"
+                      error={errors.cardNumber?.message}
+                    >
                       <div className="relative">
                         <Lock className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-                        <Input
-                          id="card-number"
-                          inputMode="numeric"
-                          placeholder="4242 4242 4242 4242"
-                          value={form.cardNumber}
-                          onChange={(e) => set({ cardNumber: e.target.value })}
-                          className="pl-8"
+                        <Controller
+                          control={control}
+                          name="cardNumber"
+                          render={({ field }) => (
+                            <Input
+                              id="card-number"
+                              inputMode="numeric"
+                              autoComplete="cc-number"
+                              placeholder="4242 4242 4242 4242"
+                              className="pl-8"
+                              aria-invalid={!!errors.cardNumber}
+                              value={field.value}
+                              onBlur={field.onBlur}
+                              onChange={(e) => field.onChange(formatCardNumber(e.target.value))}
+                            />
+                          )}
                         />
                       </div>
                     </Field>
                     <div className="grid grid-cols-2 gap-4">
-                      <Field label="Expiry" htmlFor="card-expiry">
-                        <Input
-                          id="card-expiry"
-                          placeholder="MM/YY"
-                          value={form.cardExpiry}
-                          onChange={(e) => set({ cardExpiry: e.target.value })}
+                      <Field label="Expiry" htmlFor="card-expiry" error={errors.cardExpiry?.message}>
+                        <Controller
+                          control={control}
+                          name="cardExpiry"
+                          render={({ field }) => (
+                            <Input
+                              id="card-expiry"
+                              inputMode="numeric"
+                              autoComplete="cc-exp"
+                              placeholder="MM/YY"
+                              aria-invalid={!!errors.cardExpiry}
+                              value={field.value}
+                              onBlur={field.onBlur}
+                              onChange={(e) => field.onChange(formatExpiry(e.target.value))}
+                            />
+                          )}
                         />
                       </Field>
-                      <Field label="CVV" htmlFor="card-cvv">
+                      <Field label="CVV" htmlFor="card-cvv" error={errors.cardCvv?.message}>
                         <Input
                           id="card-cvv"
                           inputMode="numeric"
+                          autoComplete="cc-csc"
                           placeholder="123"
-                          value={form.cardCvv}
-                          onChange={(e) => set({ cardCvv: e.target.value })}
+                          maxLength={4}
+                          aria-invalid={!!errors.cardCvv}
+                          {...register("cardCvv")}
                         />
                       </Field>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {hotel.policies.payment}
-                  </p>
+                  <p className="text-muted-foreground text-sm">{hotel.policies.payment}</p>
                 )}
               </CardContent>
             </Card>
           ) : null}
 
           {step === 4 ? (
-            <Card>
-              <CardContent className="space-y-5">
-                <h2 className="font-heading text-lg font-semibold">Review &amp; Confirm</h2>
-                <dl className="space-y-3 text-sm">
-                  <Row label="Lead guest">
-                    {form.firstName} {form.lastName}
-                  </Row>
-                  <Row label="Contact">
-                    {form.email} · {form.phone}
-                  </Row>
-                  <Row label="Country">{form.country}</Row>
-                  <Row label="Stay">
-                    {formatDate(checkIn)} → {formatDate(checkOut)} ({pricing.nights} {nightLabel})
-                  </Row>
-                  <Row label="Room">{room.name}</Row>
-                  <Row label="Guests">{guests}</Row>
-                  <Row label="Arrival">{form.arrivalTime}</Row>
-                  <Row label="Payment">
-                    {form.payMethod === "card" ? "Card — paid now" : "Pay at the property"}
-                  </Row>
-                  {addOns.length > 0 ? (
-                    <Row label="Extras">{addOns.map((a) => a.name).join(", ")}</Row>
-                  ) : null}
-                  {form.specialRequests ? (
-                    <Row label="Requests">{form.specialRequests}</Row>
-                  ) : null}
-                </dl>
-
-                <Separator />
-
+            <ReviewStep
+              values={getValues()}
+              room={room}
+              guests={guests}
+              checkIn={checkIn}
+              checkOut={checkOut}
+              nights={pricing.nights}
+              addOns={addOns}
+            >
+              <div>
                 <label className="flex cursor-pointer items-start gap-2.5 text-sm">
-                  <Checkbox
-                    checked={form.agree}
-                    onCheckedChange={(v) => set({ agree: v === true })}
-                    className="mt-0.5"
+                  <Controller
+                    control={control}
+                    name="agree"
+                    render={({ field }) => (
+                      <Checkbox
+                        checked={field.value === true}
+                        onCheckedChange={(v) => field.onChange(v === true)}
+                        aria-invalid={!!errors.agree}
+                        className="mt-0.5"
+                      />
+                    )}
                   />
+                  {/* Both documents exist now, so the guest can actually read
+                      what they are being asked to accept. */}
                   <span>
-                    I accept the terms &amp; conditions and the property&apos;s cancellation
-                    policy.
+                    I accept the{" "}
+                    <Link href="/terms" className="underline underline-offset-4">
+                      terms &amp; conditions
+                    </Link>{" "}
+                    and the property&apos;s{" "}
+                    <Link
+                      href="/cancellation-policy"
+                      className="underline underline-offset-4"
+                    >
+                      cancellation policy
+                    </Link>
+                    .
                   </span>
                 </label>
-              </CardContent>
-            </Card>
+                {errors.agree ? (
+                  <p className="text-destructive mt-1.5 text-sm">{errors.agree.message}</p>
+                ) : null}
+              </div>
+            </ReviewStep>
           ) : null}
 
           {/* NAV */}
           <div className="mt-6 flex items-center justify-between gap-3">
-            <Button variant="outline" onClick={back} disabled={step === 1}>
+            <Button type="button" variant="outline" onClick={back} disabled={step === 1}>
               <ArrowLeft className="size-4" />
               Back
             </Button>
             {step < steps.length ? (
-              <Button onClick={next}>
-                Continue
+              <Button type="button" onClick={next}>
+                {step === 2 && addOnIds.length === 0 ? "Skip" : "Continue"}
                 <ArrowRight className="size-4" />
               </Button>
             ) : (
-              <Button size="lg" onClick={confirm} disabled={!stay.ok}>
-                Confirm Booking
+              <Button type="submit" size="lg" disabled={!stay.ok || submitting}>
+                {submitting ? "Confirming…" : "Confirm Booking"}
               </Button>
             )}
           </div>
         </div>
 
-        {/* RIGHT — summary */}
-        <div className="min-w-0">
+        {/* RIGHT — summary (desktop) */}
+        <div className="hidden min-w-0 lg:block">
           <Card className="overflow-hidden pt-0 lg:sticky lg:top-24">
             <div className="relative h-36 w-full">
               <Image
@@ -525,72 +704,198 @@ export function CheckoutFlow({
                 className="object-cover"
               />
             </div>
-            <CardContent className="space-y-4">
-              <div>
-                <h3 className="font-heading font-semibold">{hotel.name}</h3>
-                <p className="text-muted-foreground flex items-center gap-1 text-sm">
-                  <MapPin className="size-3.5" />
-                  {hotel.city}, {hotel.country}
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-1 text-sm">
-                <p className="font-medium">{room.name}</p>
-                <p className="text-muted-foreground">
-                  {formatDate(checkIn)} → {formatDate(checkOut)}
-                </p>
-                <p className="text-muted-foreground">
-                  {guests} {guests === 1 ? "guest" : "guests"} · {pricing.nights} {nightLabel}
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">
-                    {formatCurrency(pricing.ratePerNight)} × {pricing.nights} {nightLabel}
-                  </span>
-                  <span className="font-medium">{formatCurrency(pricing.roomSubtotal)}</span>
-                </div>
-                {pricing.discount ? (
-                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-                    <span>{pricing.discount.label}</span>
-                    <span className="font-medium">{formatCurrency(pricing.discount.amount)}</span>
-                  </div>
-                ) : null}
-                {addOns.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between">
-                    <span className="text-muted-foreground">{a.name}</span>
-                    <span className="font-medium">{formatCurrency(a.price * a.qty)}</span>
-                  </div>
-                ))}
-                {/* Every charge the property configured, itemised — the old
-                    summary folded them into one flat 12% "Taxes & fees" line. */}
-                {pricing.taxes.map((t) => (
-                  <div key={t.id} className="flex items-center justify-between">
-                    <span className="text-muted-foreground">{t.label}</span>
-                    <span className="font-medium">{formatCurrency(t.amount)}</span>
-                  </div>
-                ))}
-                <Separator />
-                <div className="flex items-center justify-between text-base">
-                  <span className="font-heading font-semibold">Total</span>
-                  <span className="font-heading font-semibold">
-                    {formatCurrency(pricing.total)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-muted-foreground flex items-start gap-2 text-xs">
-                <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                {hotel.policies.cancellation}
-              </div>
-            </CardContent>
+            <CardContent>{summary}</CardContent>
           </Card>
         </div>
+      </div>
+    </form>
+  )
+}
+
+/** Read-only recap of everything the guest entered. Values are read once with
+ *  `getValues()` — the step only mounts after its inputs have been validated,
+ *  so it needs a snapshot, not a live subscription. */
+function ReviewStep({
+  values,
+  room,
+  guests,
+  checkIn,
+  checkOut,
+  nights,
+  addOns,
+  children,
+}: {
+  values: CheckoutValues
+  room: Room
+  guests: number
+  checkIn: string
+  checkOut: string
+  nights: number
+  addOns: BookingAddOn[]
+  children: React.ReactNode
+}) {
+  const nightLabel = nights === 1 ? "night" : "nights"
+
+  return (
+    <Card>
+      <CardContent className="space-y-5">
+        <h2 className="font-heading text-lg font-semibold">Review &amp; Confirm</h2>
+        <dl className="space-y-3 text-sm">
+          <Row label="Lead guest">
+            {values.firstName} {values.lastName}
+          </Row>
+          <Row label="Contact">
+            {values.email} · {values.phone}
+          </Row>
+          <Row label="Country">{values.country}</Row>
+          <Row label="Stay">
+            {formatDate(checkIn)} → {formatDate(checkOut)} ({nights} {nightLabel})
+          </Row>
+          <Row label="Room">{room.name}</Row>
+          <Row label="Guests">{guests}</Row>
+          <Row label="Arrival">{values.arrivalTime}</Row>
+          <Row label="Payment">
+            {values.payMethod === "card" ? "Card — paid now" : "Pay at the property"}
+          </Row>
+          {addOns.length > 0 ? (
+            <Row label="Extras">{addOns.map((a) => a.name).join(", ")}</Row>
+          ) : null}
+          {values.specialRequests ? (
+            <Row label="Requests">{values.specialRequests}</Row>
+          ) : null}
+        </dl>
+
+        <Separator />
+
+        {children}
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Collapsed on mobile so the total is always in view, expandable for the
+ *  itemised breakdown. */
+function MobileTotal({
+  total,
+  nights,
+  children,
+}: {
+  total: number
+  nights: number
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = React.useState(false)
+
+  return (
+    <div className="bg-background/95 supports-[backdrop-filter]:bg-background/85 sticky top-26 z-30 -mx-4 mt-6 border-y backdrop-blur sm:-mx-6 lg:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-6"
+      >
+        <span>
+          <span className="text-muted-foreground block text-xs">
+            Total for {nights} {nights === 1 ? "night" : "nights"}
+          </span>
+          <span className="font-heading text-lg font-semibold">
+            {formatCurrency(total)}
+          </span>
+        </span>
+        <span className="text-muted-foreground flex items-center gap-1 text-sm">
+          {open ? "Hide" : "Details"}
+          <ChevronDown
+            className={cn("size-4 transition-transform", open && "rotate-180")}
+          />
+        </span>
+      </button>
+      {open ? <div className="border-t px-4 py-4 sm:px-6">{children}</div> : null}
+    </div>
+  )
+}
+
+/** The itemised breakdown, shared by the desktop sidebar and the mobile
+ *  expander so the two can never drift apart. */
+function PriceSummary({
+  hotel,
+  room,
+  checkIn,
+  checkOut,
+  guests,
+  addOns,
+  pricing,
+}: {
+  hotel: Hotel
+  room: Room
+  checkIn: string
+  checkOut: string
+  guests: number
+  addOns: BookingAddOn[]
+  pricing: ReturnType<typeof priceBooking>
+}) {
+  const nightLabel = pricing.nights === 1 ? "night" : "nights"
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-heading font-semibold">{hotel.name}</h3>
+        <p className="text-muted-foreground flex items-center gap-1 text-sm">
+          <MapPin className="size-3.5" />
+          {hotel.city}, {hotel.country}
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-1 text-sm">
+        <p className="font-medium">{room.name}</p>
+        <p className="text-muted-foreground">
+          {formatDate(checkIn)} → {formatDate(checkOut)}
+        </p>
+        <p className="text-muted-foreground">
+          {guests} {guests === 1 ? "guest" : "guests"} · {pricing.nights} {nightLabel}
+        </p>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">
+            {formatCurrency(pricing.ratePerNight)} × {pricing.nights} {nightLabel}
+          </span>
+          <span className="font-medium">{formatCurrency(pricing.roomSubtotal)}</span>
+        </div>
+        {pricing.discount ? (
+          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+            <span>{pricing.discount.label}</span>
+            <span className="font-medium">{formatCurrency(pricing.discount.amount)}</span>
+          </div>
+        ) : null}
+        {addOns.map((a) => (
+          <div key={a.id} className="flex items-center justify-between">
+            <span className="text-muted-foreground">{a.name}</span>
+            <span className="font-medium">{formatCurrency(a.price * a.qty)}</span>
+          </div>
+        ))}
+        {/* Every charge the property configured, itemised — the old
+            summary folded them into one flat 12% "Taxes & fees" line. */}
+        {pricing.taxes.map((t) => (
+          <div key={t.id} className="flex items-center justify-between">
+            <span className="text-muted-foreground">{t.label}</span>
+            <span className="font-medium">{formatCurrency(t.amount)}</span>
+          </div>
+        ))}
+        <Separator />
+        <div className="flex items-center justify-between text-base">
+          <span className="font-heading font-semibold">Total</span>
+          <span className="font-heading font-semibold">{formatCurrency(pricing.total)}</span>
+        </div>
+      </div>
+
+      <div className="text-muted-foreground flex items-start gap-2 text-xs">
+        <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        {hotel.policies.cancellation}
       </div>
     </div>
   )
@@ -599,16 +904,19 @@ export function CheckoutFlow({
 function Field({
   label,
   htmlFor,
+  error,
   children,
 }: {
   label: string
   htmlFor?: string
+  error?: string
   children: React.ReactNode
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
+      {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </div>
   )
 }

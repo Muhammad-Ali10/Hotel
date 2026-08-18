@@ -2,24 +2,33 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { format } from "date-fns"
 import { AlertTriangle, CalendarDays, ShieldCheck, Users } from "lucide-react"
 
 import type { Hotel } from "@/types"
 import { formatCurrency } from "@/lib/format"
 import {
   addDays,
-  checkStay,
+  checkAvailability,
   formatDiscount,
   originalPrice,
+  parseISODate,
   priceBooking,
   toISODate,
+  unitsLeft,
 } from "@/lib/domain"
+import { useStore } from "@/store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -28,10 +37,65 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const guestItems = [1, 2, 3, 4, 5, 6].map((n) => ({
-  value: String(n),
-  label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
-}))
+/** Party sizes the chosen room can actually sleep — `Room.guests` used to be
+ *  printed on the room card and then ignored by the picker. */
+function guestOptions(max: number) {
+  return Array.from({ length: Math.max(max, 1) }, (_, i) => i + 1).map((n) => ({
+    value: String(n),
+    label: `${n} ${n === 1 ? "Guest" : "Guests"}`,
+  }))
+}
+
+type DateMatcher = Date | { before: Date }
+
+/** ISO-string in, ISO-string out — the rest of the card speaks ISO. */
+function DateField({
+  label,
+  value,
+  disabled,
+  onSelect,
+}: {
+  label: string
+  value: string
+  disabled: DateMatcher[]
+  onSelect: (iso: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const selected = parseISODate(value)
+
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              className="h-9 w-full justify-start gap-2 font-normal"
+            >
+              <CalendarDays className="text-muted-foreground size-4" />
+              {format(selected, "d MMM yyyy")}
+            </Button>
+          }
+        />
+        <PopoverContent align="start" className="w-auto p-0">
+          <Calendar
+            mode="single"
+            selected={selected}
+            defaultMonth={selected}
+            disabled={disabled}
+            onSelect={(date) => {
+              if (date) onSelect(toISODate(date))
+              setOpen(false)
+            }}
+            autoFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+}
 
 /**
  * The booking box. It carries the guest's dates, party size and chosen room
@@ -48,6 +112,7 @@ export function ReserveCard({
   onSelectRoom?: (roomId: string) => void
 }) {
   const router = useRouter()
+  const bookings = useStore((s) => s.bookings)
   const tomorrow = React.useMemo(() => addDays(toISODate(new Date()), 1), [])
 
   const [checkIn, setCheckIn] = React.useState(tomorrow)
@@ -56,17 +121,38 @@ export function ReserveCard({
   )
   const [guests, setGuests] = React.useState("2")
 
+  // Surfacing the partner's closed dates in the picker itself, so a guest can't
+  // pick a night that `checkStay` would only reject afterwards.
+  const today = React.useMemo(() => parseISODate(toISODate(new Date())), [])
+  const closedDates = React.useMemo(
+    () => hotel.availability.closedDates.map(parseISODate),
+    [hotel.availability.closedDates]
+  )
+
   const roomId = selectedRoomId ?? hotel.rooms[0]?.id ?? ""
   const room = hotel.rooms.find((r) => r.id === roomId) ?? hotel.rooms[0]
   const roomItems = hotel.rooms.map((r) => ({ value: r.id, label: r.name }))
 
-  const stay = checkStay(hotel.availability, checkIn, checkOut)
+  const guestItems = guestOptions(room?.guests ?? 2)
+  // Clamped rather than corrected in an effect: switching from a suite to a
+  // double must not carry a party of four across, and the repo forbids
+  // setState-in-effect. `partySize` is the only guest count read from here on.
+  const partySize = Math.min(Number(guests), room?.guests ?? Number(guests))
+
+  const stay = checkAvailability({
+    hotel,
+    room,
+    checkIn,
+    checkOut,
+    guests: partySize,
+    bookings,
+  })
+  const remaining = unitsLeft(room, bookings, hotel.id, checkIn, checkOut)
+
   const pricing = React.useMemo(
     () =>
-      stay.ok
-        ? priceBooking({ hotel, room, checkIn, checkOut, guests: Number(guests) })
-        : null,
-    [hotel, room, checkIn, checkOut, guests, stay.ok]
+      stay.ok ? priceBooking({ hotel, room, checkIn, checkOut, guests: partySize }) : null,
+    [hotel, room, checkIn, checkOut, partySize, stay.ok]
   )
 
   const strikethrough = originalPrice(hotel)
@@ -78,7 +164,7 @@ export function ReserveCard({
       room: room.id,
       checkin: checkIn,
       checkout: checkOut,
-      guests,
+      guests: String(partySize),
     })
     router.push(`/checkout?${params.toString()}`)
   }
@@ -111,50 +197,49 @@ export function ReserveCard({
 
         <Separator />
 
-        {/* Dates */}
+        {/* Dates — the same Calendar popover the header search uses. These were
+            native date inputs, which render differently in every browser and
+            let the guest type a date the property is closed on. */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="check-in">Check in</Label>
-            <div className="relative">
-              <CalendarDays className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-              <Input
-                id="check-in"
-                type="date"
-                value={checkIn}
-                min={toISODate(new Date())}
-                onChange={(e) => setCheckIn(e.target.value)}
-                className="h-9 pl-8"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="check-out">Check out</Label>
-            <div className="relative">
-              <CalendarDays className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
-              <Input
-                id="check-out"
-                type="date"
-                value={checkOut}
-                min={addDays(checkIn, 1)}
-                onChange={(e) => setCheckOut(e.target.value)}
-                className="h-9 pl-8"
-              />
-            </div>
-          </div>
+          <DateField
+            label="Check in"
+            value={checkIn}
+            disabled={[{ before: today }, ...closedDates]}
+            onSelect={(iso) => {
+              setCheckIn(iso)
+              if (iso >= checkOut) setCheckOut(addDays(iso, hotel.availability.minStay || 1))
+            }}
+          />
+          <DateField
+            label="Check out"
+            value={checkOut}
+            disabled={[{ before: parseISODate(addDays(checkIn, 1)) }, ...closedDates]}
+            onSelect={setCheckOut}
+          />
         </div>
 
-        {/* Availability — the partner's open/close and min-stay rules */}
+        {/* Availability — the property's calendar rules, the room's occupancy
+            limit, and how many units are actually left to sell */}
         {!stay.ok ? (
           <p className="text-destructive flex items-start gap-1.5 text-sm">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
             {stay.message}
+          </p>
+        ) : remaining <= 3 ? (
+          <p className="flex items-start gap-1.5 text-sm text-amber-600 dark:text-amber-500">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+            Only {remaining} {remaining === 1 ? "room" : "rooms"} left at this price.
           </p>
         ) : null}
 
         {/* Guests */}
         <div className="space-y-1.5">
           <Label>Guests</Label>
-          <Select items={guestItems} value={guests} onValueChange={(v) => setGuests(v as string)}>
+          <Select
+            items={guestItems}
+            value={String(partySize)}
+            onValueChange={(v) => setGuests(v as string)}
+          >
             <SelectTrigger className="h-9 w-full">
               <Users className="text-muted-foreground size-4" />
               <SelectValue />

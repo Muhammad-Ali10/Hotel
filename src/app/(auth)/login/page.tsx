@@ -1,8 +1,10 @@
 "use client"
 
-import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useForm, Controller } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -11,11 +13,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 
+const loginSchema = z.object({
+  email: z.email("Enter a valid email address"),
+  password: z.string().min(1, "Enter your password"),
+  remember: z.boolean(),
+})
+
+type LoginValues = z.infer<typeof loginSchema>
+
 export default function LoginPage() {
   const router = useRouter()
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+    defaultValues: { email: "", password: "", remember: false },
+  })
+
+  function onSubmit() {
     toast.success("Signed in", { description: "Welcome back to Stayora." })
     router.push("/dashboard")
   }
@@ -29,22 +49,57 @@ export default function LoginPage() {
         </p>
       </CardHeader>
       <CardContent>
-        <form onSubmit={onSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="you@example.com" required />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              aria-invalid={!!errors.email}
+              {...register("email")}
+            />
+            {errors.email ? (
+              <p className="text-destructive text-sm">{errors.email.message}</p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor="password">Password</Label>
-              <Link href="#" className="text-muted-foreground hover:text-foreground text-sm">
+              {/* There is no reset flow yet, so this points at the people who
+                  can actually help rather than at "#". */}
+              <Link
+                href="/support#contact"
+                className="text-muted-foreground hover:text-foreground text-sm"
+              >
                 Forgot password?
               </Link>
             </div>
-            <Input id="password" type="password" placeholder="••••••••" required />
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              aria-invalid={!!errors.password}
+              {...register("password")}
+            />
+            {errors.password ? (
+              <p className="text-destructive text-sm">{errors.password.message}</p>
+            ) : null}
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <Checkbox /> Remember me
+            <Controller
+              control={control}
+              name="remember"
+              render={({ field }) => (
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(v) => field.onChange(v === true)}
+                />
+              )}
+            />
+            Remember me
           </label>
           <Button type="submit" className="w-full">
             Sign In

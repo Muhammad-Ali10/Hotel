@@ -11,7 +11,7 @@ import { WizardShell } from "../_components/wizard-shell"
 import { SummaryList } from "../_components/summary"
 import { useWizard } from "../_components/wizard-provider"
 import { href, nextStep } from "../_lib/steps"
-import { propertyTypeLabels, pkr } from "../_lib/labels"
+import { propertyTypeLabels, money } from "../_lib/labels"
 
 export default function SubmittedPage() {
   const router = useRouter()
@@ -58,7 +58,7 @@ export default function SubmittedPage() {
                 { label: "Location", value: location || "—" },
                 { label: "Rooms", value: rooms },
                 { label: "Photos", value: data.photos },
-                { label: "Base rate", value: pkr(data.baseRate) },
+                { label: "Base rate", value: money(data.baseRate) },
               ]}
             />
           </div>
