@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# env files — .env.example is committed, real ones are not
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*

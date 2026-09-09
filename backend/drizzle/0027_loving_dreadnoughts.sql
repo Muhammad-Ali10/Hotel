@@ -1,0 +1,1 @@
+ALTER TABLE "partner_members" ADD COLUMN "job_title" varchar(80) DEFAULT '' NOT NULL;

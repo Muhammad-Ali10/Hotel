@@ -1,0 +1,39 @@
+# Local development dependencies.
+#
+#   docker compose up -d      start
+#   docker compose down       stop (data survives)
+#   docker compose down -v    stop and DESTROY the data volume
+#
+# Nothing here is a production topology — it exists so every machine runs the
+# same Postgres version without anyone installing one.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: stayora-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stayora
+      # Deterministic collation, so ORDER BY on text behaves identically on
+      # every developer's machine and in CI.
+      POSTGRES_INITDB_ARGS: "--locale=C --encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18+ wants the mount one level UP, at /var/lib/postgresql, and
+      # places the cluster in a major-version subdirectory itself. Mounting the
+      # old /var/lib/postgresql/data makes the image refuse to start.
+      - stayora-pgdata:/var/lib/postgresql
+    healthcheck:
+      # `npm run db:migrate` should wait for this, not for the port to open —
+      # Postgres accepts TCP before it is ready to answer queries.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stayora"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  stayora-pgdata:

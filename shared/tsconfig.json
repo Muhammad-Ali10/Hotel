@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    // CommonJS so `nest build` (tsc, commonjs) can consume the emitted output
+    // directly. Next bundles it fine either way.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "incremental": true
+  },
+  "include": ["src/**/*"],
+  // Tests ARE typechecked — `tsconfig.build.json` is what keeps them out of
+  // dist. Excluding them here let a fixture drift from the types unnoticed.
+  "exclude": ["node_modules", "dist"]
+}

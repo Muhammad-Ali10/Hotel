@@ -1,0 +1,17 @@
+{
+  "name": "@stayora/qa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser and API checks that run against a running Stayora.",
+  "scripts": {
+    "smoke": "node suites/smoke.mjs",
+    "guards": "node suites/guards.mjs",
+    "boundaries": "node suites/boundaries.mjs",
+    "money": "node suites/money.mjs",
+    "all": "node run-all.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.50.0"
+  }
+}

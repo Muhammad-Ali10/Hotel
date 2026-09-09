@@ -1,0 +1,146 @@
+"use client"
+
+import * as React from "react"
+import { useRouter } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
+import { toast } from "sonner"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+
+import { WizardShell, StepHeading } from "../../_components/wizard-shell"
+import { TipPanel } from "../../_components/tip-panel"
+import { useWizard } from "../../_components/wizard-provider"
+import { href, nextStep, prevStep } from "../../_lib/steps"
+import { newUnit } from "../../_lib/types"
+import { money } from "../../_lib/labels"
+
+export default function RatePlanPage() {
+  const router = useRouter()
+  const { data, save, saving } = useWizard()
+  const [enabled, setEnabled] = React.useState(data.draftUnit.ratePlan.enabled)
+  const [discount, setDiscount] = React.useState(data.draftUnit.ratePlan.discount)
+
+  // Cents, and no fallback. It was `|| 14000` — a rupee-era figure that read
+  // as $140 once the flow was formatting in USD, quoted at a partner who had
+  // set no price at all.
+  const base = data.draftUnit.price
+  const off = Math.round((base * discount) / 100)
+  const nonRefundable = base - off
+
+  /**
+   * The end of the sub-flow: the draft unit becomes one of the property's rooms.
+   *
+   * One save, holding both the appended list and the emptied draft. Two saves
+   * would leave a window where a partner who closed the tab between them came
+   * back to a room they had added and a draft still half-holding it.
+   */
+  async function commit() {
+    const committed = {
+      ...data.draftUnit,
+      ratePlan: { enabled, discount },
+    }
+    const ok = await save({
+      units: [...data.units, committed],
+      draftUnit: newUnit(),
+    })
+    if (!ok) return
+
+    toast.success(`${committed.name || "Room"} added`)
+    const next = nextStep("unit-rate-plan")
+    if (next) router.push(href(next.path))
+  }
+
+  function cancel() {
+    const prev = prevStep("unit-rate-plan")
+    if (prev) router.push(href(prev.path))
+  }
+
+  return (
+    <WizardShell
+      aside={
+        <TipPanel title="Why offer a non-refundable rate?">
+          {/* The 60% and the 28% were written into this file, not measured. */}
+          It is a second price for the same room: cheaper, and the guest cannot
+          cancel it. A non-refundable rate is always paid up front — the
+          platform charges the card at booking rather than holding it — so the
+          stay is settled before anyone arrives. Guests who know their dates
+          take it; everyone else books your ordinary rate.
+        </TipPanel>
+      }
+    >
+      <StepHeading
+        title="Set up a non-refundable rate plan"
+        description="Offer a discounted non-refundable option to attract price-sensitive guests and secure guaranteed bookings."
+      />
+
+      <div className="rounded-xl border p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Set up a non-refundable rate plan</p>
+            <p className="text-muted-foreground text-xs">
+              Guests pay less but can&apos;t cancel for a refund
+            </p>
+          </div>
+          <Switch checked={enabled} onCheckedChange={setEnabled} />
+        </div>
+      </div>
+
+      {enabled && (
+        <>
+          <div className="mt-6 space-y-2">
+            <Label htmlFor="discount">
+              Discount for guests that book with this rate plan
+            </Label>
+            <div className="flex items-stretch gap-2">
+              <Input
+                id="discount"
+                type="number"
+                min={0}
+                max={100}
+                value={discount}
+                onChange={(e) =>
+                  setDiscount(Math.min(100, Math.max(0, Number(e.target.value) || 0)))
+                }
+                className="w-24"
+              />
+              <span className="bg-muted text-muted-foreground flex items-center rounded-lg border px-3 text-sm">
+                %
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border p-4">
+            <p className="mb-1 text-sm font-semibold">Rate breakdown</p>
+            <div className="divide-y text-sm">
+              <div className="flex justify-between py-2">
+                <span className="text-muted-foreground">Base price</span>
+                <span className="font-medium">{money(base)}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-muted-foreground">Discount ({discount}%)</span>
+                <span className="font-medium">−{money(off)}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="font-medium">Non-refundable price</span>
+                <span className="font-semibold">{money(nonRefundable)}</span>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="mt-8 flex items-center gap-3">
+        <Button variant="outline" type="button" onClick={cancel}>
+          <ArrowLeft className="size-4" />
+          Cancel
+        </Button>
+        <Button type="button" onClick={commit} disabled={saving} className="flex-1">
+          Save
+        </Button>
+      </div>
+    </WizardShell>
+  )
+}

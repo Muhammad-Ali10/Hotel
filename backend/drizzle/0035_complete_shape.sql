@@ -1,0 +1,2 @@
+ALTER TABLE "registration_documents" DROP CONSTRAINT "registration_documents_kind_check";--> statement-breakpoint
+ALTER TABLE "registration_documents" ADD CONSTRAINT "registration_documents_kind_check" CHECK ("registration_documents"."kind" IN ('identity', 'ownership', 'business', 'tax', 'other', 'photo'));

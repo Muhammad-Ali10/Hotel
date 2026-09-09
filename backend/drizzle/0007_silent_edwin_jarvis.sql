@@ -1,0 +1,2 @@
+ALTER TABLE "reviews" DROP CONSTRAINT "reviews_status_check";--> statement-breakpoint
+ALTER TABLE "reviews" ADD CONSTRAINT "reviews_status_check" CHECK ("reviews"."status" IN ('published', 'pending', 'flagged', 'rejected', 'withdrawn'));

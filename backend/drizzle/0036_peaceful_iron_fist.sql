@@ -1,0 +1,1 @@
+ALTER TABLE "partner_orgs" ADD COLUMN "billing_address" varchar(300) DEFAULT '' NOT NULL;
